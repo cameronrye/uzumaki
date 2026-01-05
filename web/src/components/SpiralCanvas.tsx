@@ -1,5 +1,171 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { generateSpiral, SpiralParams, COLOR_PRESETS } from '../utils/spirals';
+import { generateSpiral, SpiralParams, COLOR_PRESETS, SpiralPoint } from '../utils/spirals';
+import { useSpiralWorker } from '../hooks/useSpiralWorker';
+import { supportsOffscreenCanvas } from '../utils/spiralTypedArrays';
+
+// ============================================================================
+// Batched rendering helpers for optimized canvas drawing
+// ============================================================================
+
+/** Render points with color batching - single beginPath/fill per color */
+function renderPointsBatched(
+  ctx: CanvasRenderingContext2D,
+  points: SpiralPoint[],
+  colors: string[],
+  centerX: number,
+  centerY: number,
+  zoom: number
+): void {
+  ctx.globalAlpha = 1;
+  const pointRadius = Math.max(1.5, 3 * zoom);
+  const numColors = colors.length;
+  const pointsPerColor = Math.ceil(points.length / numColors);
+
+  for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
+    ctx.fillStyle = colors[colorIdx];
+    ctx.beginPath();
+
+    const startIdx = colorIdx * pointsPerColor;
+    const endIdx = Math.min((colorIdx + 1) * pointsPerColor, points.length);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      const x = centerX + points[i].x;
+      const y = centerY + points[i].y;
+      ctx.moveTo(x + pointRadius, y);
+      ctx.arc(x, y, pointRadius, 0, Math.PI * 2);
+    }
+
+    ctx.fill();
+  }
+}
+
+/** Render triangles with color batching */
+function renderTrianglesBatched(
+  ctx: CanvasRenderingContext2D,
+  points: SpiralPoint[],
+  colors: string[],
+  centerX: number,
+  centerY: number
+): void {
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const originX = centerX + points[0].x;
+  const originY = centerY + points[0].y;
+  const numColors = colors.length;
+  const trianglesPerColor = Math.ceil((points.length - 1) / numColors);
+
+  // Batch triangles by color
+  for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
+    ctx.strokeStyle = colors[colorIdx];
+    ctx.beginPath();
+
+    const startIdx = colorIdx * trianglesPerColor + 1;
+    const endIdx = Math.min((colorIdx + 1) * trianglesPerColor + 1, points.length);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      ctx.moveTo(originX, originY);
+      if (i > 1) {
+        ctx.lineTo(centerX + points[i - 1].x, centerY + points[i - 1].y);
+      }
+      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+      ctx.lineTo(originX, originY);
+    }
+
+    ctx.stroke();
+  }
+
+  // Draw outer edge
+  ctx.strokeStyle = colors[0];
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (points.length > 1) {
+    ctx.moveTo(centerX + points[1].x, centerY + points[1].y);
+    for (let i = 2; i < points.length; i++) {
+      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+    }
+  }
+  ctx.stroke();
+}
+
+/** Render glow effect layers */
+function renderGlow(
+  ctx: CanvasRenderingContext2D,
+  points: SpiralPoint[],
+  colors: string[],
+  centerX: number,
+  centerY: number,
+  isGlowOnly: boolean,
+  isPerformanceMode: boolean | undefined
+): void {
+  const glowColor = colors[2] || colors[0];
+  const glowLayers = isPerformanceMode
+    ? [{ width: 8, opacity: 0.2 }]
+    : [
+        { width: 12, opacity: 0.1 },
+        { width: 8, opacity: 0.15 },
+        { width: 5, opacity: 0.2 },
+      ];
+
+  for (const layer of glowLayers) {
+    ctx.beginPath();
+    ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+    }
+    ctx.strokeStyle = glowColor;
+    ctx.globalAlpha = isGlowOnly ? layer.opacity * 2 : layer.opacity;
+    ctx.lineWidth = isGlowOnly ? layer.width * 1.5 : layer.width;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Render main line with optional thickness variation (batched by width buckets) */
+function renderLine(
+  ctx: CanvasRenderingContext2D,
+  points: SpiralPoint[],
+  gradient: CanvasGradient,
+  centerX: number,
+  centerY: number,
+  hasThicknessVariation: boolean | undefined
+): void {
+  ctx.strokeStyle = gradient;
+
+  if (hasThicknessVariation) {
+    const bucketCount = 10;
+    const segmentsPerBucket = Math.ceil(points.length / bucketCount);
+
+    for (let bucket = 0; bucket < bucketCount; bucket++) {
+      const startIdx = bucket * segmentsPerBucket;
+      const endIdx = Math.min((bucket + 1) * segmentsPerBucket, points.length);
+      const midProgress = (startIdx + endIdx) / 2 / points.length;
+
+      ctx.beginPath();
+      ctx.lineWidth = 1 + midProgress * 3;
+
+      if (startIdx < points.length) {
+        ctx.moveTo(centerX + points[startIdx].x, centerY + points[startIdx].y);
+        for (let i = startIdx + 1; i < endIdx; i++) {
+          ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+        }
+        ctx.stroke();
+      }
+    }
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+    }
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+// ============================================================================
 
 interface SpiralCanvasProps {
   params: SpiralParams;
@@ -11,54 +177,124 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [useWorker, setUseWorker] = useState(true);
+  const workerInitializedRef = useRef(false);
+  const dimensionsRef = useRef({ width: 0, height: 0 });
 
   // Use params for zoom/pan - single source of truth from parent
   const currentZoom = params.zoom ?? 1;
   const currentPanX = params.panX ?? 0;
   const currentPanY = params.panY ?? 0;
 
-  // Memoize color preset lookup (Fix #8)
+  // Memoize color preset lookup
   const colorPresetData = useMemo(() => {
     return COLOR_PRESETS.find(p => p.id === params.colorPreset) || COLOR_PRESETS[0];
   }, [params.colorPreset]);
 
-  // Handle canvas resize
+  // Initialize spiral worker with OffscreenCanvas support
+  const {
+    isOffscreenMode,
+    isReady: workerReady,
+    requestRender,
+    initOffscreenCanvas,
+    isSupported: workerSupported,
+  } = useSpiralWorker({
+    useOffscreenCanvas: useWorker && supportsOffscreenCanvas(),
+  });
+
+  // Initialize OffscreenCanvas with worker (only once)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !workerSupported || workerInitializedRef.current) return;
+
+    // Try to initialize OffscreenCanvas rendering
+    if (supportsOffscreenCanvas()) {
+      const success = initOffscreenCanvas(canvas);
+      if (success) {
+        workerInitializedRef.current = true;
+        // Store dimensions for worker
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        dimensionsRef.current = { width: rect.width * dpr, height: rect.height * dpr };
+      } else {
+        setUseWorker(false);
+      }
+    } else {
+      setUseWorker(false);
+    }
+  }, [workerSupported, initOffscreenCanvas]);
+
+  // Handle canvas resize (fallback mode only - worker handles its own canvas)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const resizeCanvas = () => {
+    // In OffscreenCanvas mode, we just track dimensions
+    const updateDimensions = () => {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dimensionsRef.current = { width: rect.width * dpr, height: rect.height * dpr };
     };
 
-    resizeCanvas();
+    // Only set up 2D context for fallback (non-offscreen) mode
+    if (!isOffscreenMode) {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    // Debounced resize handler
-    let resizeTimeout: number;
-    const debouncedResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = window.setTimeout(resizeCanvas, 100);
-    };
+      const resizeCanvas = () => {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        dimensionsRef.current = { width: rect.width, height: rect.height };
+      };
 
-    window.addEventListener('resize', debouncedResize);
-    return () => {
-      window.removeEventListener('resize', debouncedResize);
-      clearTimeout(resizeTimeout);
-    };
-  }, []);
+      resizeCanvas();
 
-  // Draw spiral
+      let resizeTimeout: number;
+      const debouncedResize = () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = window.setTimeout(resizeCanvas, 100);
+      };
+
+      window.addEventListener('resize', debouncedResize);
+      return () => {
+        window.removeEventListener('resize', debouncedResize);
+        clearTimeout(resizeTimeout);
+      };
+    } else {
+      updateDimensions();
+
+      let resizeTimeout: number;
+      const debouncedResize = () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = window.setTimeout(updateDimensions, 100);
+      };
+
+      window.addEventListener('resize', debouncedResize);
+      return () => {
+        window.removeEventListener('resize', debouncedResize);
+        clearTimeout(resizeTimeout);
+      };
+    }
+  }, [isOffscreenMode]);
+
+  // Draw spiral - uses Web Worker with OffscreenCanvas when available, falls back to main thread
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // OffscreenCanvas mode: delegate rendering to worker
+    if (isOffscreenMode && workerReady) {
+      const { width, height } = dimensionsRef.current;
+      if (width > 0 && height > 0) {
+        requestRender(params, width, height);
+      }
+      return;
+    }
+
+    // Fallback: render on main thread with batched operations
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -66,23 +302,18 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     const centerX = rect.width / 2 + currentPanX;
     const centerY = rect.height / 2 + currentPanY;
 
-    // Clear canvas - use transparent since background is handled by CSS
     ctx.clearRect(0, 0, rect.width, rect.height);
 
-    // Generate spiral points (zoom is already in params)
     const points = generateSpiral(params);
     if (points.length < 2) return;
 
-    // Use memoized color preset
     const colors = colorPresetData.colors;
 
-    // Create gradient stroke that scales with viewport
     const gradientSize = Math.min(rect.width, rect.height) * 0.4;
     const gradient = ctx.createLinearGradient(
       centerX - gradientSize, centerY - gradientSize,
       centerX + gradientSize, centerY + gradientSize
     );
-
     colors.forEach((color, i) => {
       gradient.addColorStop(i / (colors.length - 1), color);
     });
@@ -90,17 +321,11 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Set line dash based on line style
     const lineStyle = params.lineStyle || 'solid';
     switch (lineStyle) {
-      case 'dashed':
-        ctx.setLineDash([10, 5]);
-        break;
-      case 'dotted':
-        ctx.setLineDash([2, 4]);
-        break;
-      default:
-        ctx.setLineDash([]);
+      case 'dashed': ctx.setLineDash([10, 5]); break;
+      case 'dotted': ctx.setLineDash([2, 4]); break;
+      default: ctx.setLineDash([]);
     }
 
     const isGlowOnly = lineStyle === 'glow';
@@ -109,134 +334,21 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     const isPerformanceMode = params.performanceMode;
     const hasThicknessVariation = params.lineThicknessVariation;
 
-    // Triangles mode: draw triangles from center (ideal for Theodorus spiral)
     if (isTrianglesMode) {
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      // First point is the center for Theodorus spiral
-      const originX = centerX + points[0].x;
-      const originY = centerY + points[0].y;
-
-      for (let i = 1; i < points.length; i++) {
-        const progress = i / points.length;
-        const colorIndex = Math.floor(progress * (colors.length - 1));
-        ctx.strokeStyle = colors[colorIndex];
-
-        // Draw triangle: center -> previous point -> current point -> center
-        ctx.beginPath();
-        ctx.moveTo(originX, originY);
-        if (i > 1) {
-          ctx.lineTo(centerX + points[i - 1].x, centerY + points[i - 1].y);
-        }
-        ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
-        ctx.lineTo(originX, originY);
-        ctx.stroke();
-      }
-
-      // Draw hypotenuse markers (the outer edge)
-      ctx.strokeStyle = colors[0];
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      if (points.length > 1) {
-        ctx.moveTo(centerX + points[1].x, centerY + points[1].y);
-        for (let i = 2; i < points.length; i++) {
-          ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
-        }
-      }
-      ctx.stroke();
+      renderTrianglesBatched(ctx, points, colors, centerX, centerY);
     } else if (isPointsMode) {
-      // Points mode: draw discrete circles (ideal for Vogel/phyllotaxis patterns)
-      ctx.globalAlpha = 1;
-      const pointRadius = Math.max(1.5, 3 * (params.zoom ?? 1));
-
-      for (let i = 0; i < points.length; i++) {
-        const progress = i / points.length;
-        const colorIndex = Math.floor(progress * (colors.length - 1));
-        const nextColorIndex = Math.min(colorIndex + 1, colors.length - 1);
-        const colorProgress = (progress * (colors.length - 1)) % 1;
-
-        // Interpolate between colors for smooth gradient
-        ctx.fillStyle = colors[colorIndex];
-        if (colorProgress > 0 && colorIndex !== nextColorIndex) {
-          ctx.fillStyle = colors[nextColorIndex];
-        }
-
-        ctx.beginPath();
-        ctx.arc(centerX + points[i].x, centerY + points[i].y, pointRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      renderPointsBatched(ctx, points, colors, centerX, centerY, params.zoom ?? 1);
     } else {
-      // Draw glow effect (skip in performance mode for glow-only, otherwise always draw)
       if (!isPerformanceMode || isGlowOnly) {
-        const glowColor = colors[2] || colors[0];
-        const glowLayers = isPerformanceMode
-          ? [{ width: 8, opacity: 0.2 }]
-          : [
-              { width: 12, opacity: 0.1 },
-              { width: 8, opacity: 0.15 },
-              { width: 5, opacity: 0.2 },
-            ];
-
-        for (const layer of glowLayers) {
-          ctx.beginPath();
-          ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
-          for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
-          }
-          ctx.strokeStyle = glowColor;
-          ctx.globalAlpha = isGlowOnly ? layer.opacity * 2 : layer.opacity;
-          ctx.lineWidth = isGlowOnly ? layer.width * 1.5 : layer.width;
-          ctx.stroke();
-        }
+        renderGlow(ctx, points, colors, centerX, centerY, isGlowOnly, isPerformanceMode);
       }
-
-      // Draw main spiral (skip for glow-only mode)
       if (!isGlowOnly) {
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = gradient;
-
-        if (hasThicknessVariation) {
-          // Fix #9: Optimize variable thickness - batch similar widths
-          // Group segments into buckets to reduce draw calls
-          const bucketCount = 10;
-          const segmentsPerBucket = Math.ceil(points.length / bucketCount);
-
-          for (let bucket = 0; bucket < bucketCount; bucket++) {
-            const startIdx = bucket * segmentsPerBucket;
-            const endIdx = Math.min((bucket + 1) * segmentsPerBucket, points.length);
-            const midProgress = (startIdx + endIdx) / 2 / points.length;
-
-            ctx.beginPath();
-            ctx.lineWidth = 1 + midProgress * 3;
-
-            if (startIdx < points.length) {
-              ctx.moveTo(centerX + points[startIdx].x, centerY + points[startIdx].y);
-              for (let i = startIdx + 1; i < endIdx; i++) {
-                ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
-              }
-              ctx.stroke();
-            }
-          }
-        } else {
-          // Draw with uniform thickness
-          ctx.beginPath();
-          ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
-          for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
-          }
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+        renderLine(ctx, points, gradient, centerX, centerY, hasThicknessVariation);
       }
     }
 
-    // Reset line dash
     ctx.setLineDash([]);
-
-  }, [params, currentPanX, currentPanY, colorPresetData]);
+  }, [params, currentPanX, currentPanY, colorPresetData, isOffscreenMode, workerReady, requestRender]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {

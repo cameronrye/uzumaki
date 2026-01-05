@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useMemo } from 'react';
 import { useSpiralState, SpiralState, SpiralActions } from '../hooks/useSpiralState';
 import { SpiralParams, COLOR_PRESETS } from '../utils/spirals';
 import { NUM_STEPS_PERFORMANCE_MAX } from '../utils/constants';
@@ -18,14 +18,15 @@ interface SpiralProviderProps {
 export function SpiralProvider({ children }: SpiralProviderProps) {
   const [state, actions] = useSpiralState();
 
-  // Compute params from state for canvas rendering
-  const params: SpiralParams = {
+  // Memoize params to prevent unnecessary object recreation on every render.
+  // This is critical for performance as params is passed to canvas and worker.
+  const params = useMemo<SpiralParams>(() => ({
     type: state.spiralType,
     tightness: state.tightness,
     spinRate: state.spinRate,
     stepSize: state.stepSize,
-    numSteps: state.performanceMode 
-      ? Math.min(state.numSteps, NUM_STEPS_PERFORMANCE_MAX) 
+    numSteps: state.performanceMode
+      ? Math.min(state.numSteps, NUM_STEPS_PERFORMANCE_MAX)
       : state.numSteps,
     time: state.time,
     viewportScale: state.viewportScale,
@@ -38,7 +39,24 @@ export function SpiralProvider({ children }: SpiralProviderProps) {
     backgroundStyle: state.backgroundStyle,
     performanceMode: state.performanceMode,
     lineThicknessVariation: state.lineThicknessVariation,
-  };
+  }), [
+    state.spiralType,
+    state.tightness,
+    state.spinRate,
+    state.stepSize,
+    state.numSteps,
+    state.performanceMode,
+    state.time,
+    state.viewportScale,
+    state.isPaused,
+    state.colorPreset,
+    state.zoom,
+    state.panX,
+    state.panY,
+    state.lineStyle,
+    state.backgroundStyle,
+    state.lineThicknessVariation,
+  ]);
 
   return (
     <SpiralContext.Provider value={{ state, actions, params }}>

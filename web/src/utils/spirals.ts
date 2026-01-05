@@ -1,3 +1,10 @@
+import {
+  TypedSpiralPoints,
+  createTypedPoints,
+  setPoint,
+  applyTransformationsTyped,
+} from './spiralTypedArrays';
+
 export type SpiralType =
   | 'archimedean'
   | 'fermat'
@@ -14,6 +21,9 @@ export interface SpiralPoint {
   x: number;
   y: number;
 }
+
+// Re-export TypedSpiralPoints for consumers
+export type { TypedSpiralPoints } from './spiralTypedArrays';
 
 export interface SpiralParams {
   type: SpiralType;
@@ -322,3 +332,123 @@ export const SPIRAL_PRESETS: SpiralPreset[] = [
   },
 ];
 
+// ============================================================================
+// TypedArray-based spiral generation for Web Worker performance
+// ============================================================================
+
+/**
+ * Generate polar spiral directly into TypedArray
+ */
+function generatePolarSpiralTyped(params: SpiralParams): TypedSpiralPoints {
+  const { spinRate, stepSize, numSteps, time } = params;
+  const points = createTypedPoints(numSteps);
+  const rotation = time * spinRate;
+
+  for (let i = 0; i < numSteps; i++) {
+    const theta = i * stepSize + rotation;
+    const r = calculateRadius(i * stepSize, params);
+    setPoint(points, i, r * Math.cos(theta), r * Math.sin(theta));
+  }
+  return points;
+}
+
+/**
+ * Generate Theodorus spiral directly into TypedArray
+ */
+function generateTheodorusTyped(params: SpiralParams): TypedSpiralPoints {
+  const { tightness, numSteps, time, viewportScale, spinRate } = params;
+  const points = createTypedPoints(numSteps + 1);
+  const scale = tightness * 3 * viewportScale;
+  const rotation = time * spinRate;
+
+  let x = 0, y = 0;
+  let angle = rotation;
+
+  setPoint(points, 0, 0, 0);
+
+  for (let n = 1; n <= numSteps; n++) {
+    angle += Math.atan(1 / Math.sqrt(n));
+    x += Math.cos(angle);
+    y += Math.sin(angle);
+    setPoint(points, n, x * scale, y * scale);
+  }
+  return points;
+}
+
+/**
+ * Generate Vogel spiral directly into TypedArray
+ */
+function generateVogelTyped(params: SpiralParams): TypedSpiralPoints {
+  const { tightness, numSteps, time, viewportScale, spinRate } = params;
+  const points = createTypedPoints(numSteps);
+  const scale = tightness * viewportScale;
+  const rotation = time * spinRate;
+
+  for (let n = 0; n < numSteps; n++) {
+    const theta = n * GOLDEN_ANGLE + rotation;
+    const r = scale * Math.sqrt(n) * 2;
+    setPoint(points, n, r * Math.cos(theta), r * Math.sin(theta));
+  }
+  return points;
+}
+
+/**
+ * Generate Uzumaki spiral directly into TypedArray
+ */
+function generateUzumakiTyped(params: SpiralParams): TypedSpiralPoints {
+  const { tightness, numSteps, time, viewportScale } = params;
+  const points = createTypedPoints(numSteps);
+
+  for (let n = 1; n <= numSteps; n++) {
+    const scale = Math.pow(n, 1.5) / (n + 1000) * tightness * 10 * viewportScale;
+    const angle = 0.1 * n * Math.sin(83.3333 * time * 0.01);
+    const spiral = 0.1 * n * time * 0.1;
+    setPoint(points, n - 1, scale * Math.sin(angle + spiral), scale * Math.cos(angle + spiral));
+  }
+  return points;
+}
+
+/**
+ * Generate Curlicue spiral directly into TypedArray
+ */
+function generateCurlicueTyped(params: SpiralParams): TypedSpiralPoints {
+  const { tightness, numSteps, time, viewportScale } = params;
+  const points = createTypedPoints(numSteps);
+  const s = PHI;
+
+  let x = 0, y = 0;
+  const segmentLength = tightness * 0.5 * viewportScale;
+  const timeOffset = time * 0.1;
+
+  for (let n = 0; n < numSteps; n++) {
+    setPoint(points, n, x, y);
+    const phi = 2 * Math.PI * s * n * n + timeOffset;
+    x += segmentLength * Math.cos(phi);
+    y += segmentLength * Math.sin(phi);
+  }
+  return points;
+}
+
+// TypedArray generator dispatch map
+const TYPED_SPIRAL_GENERATORS: Partial<Record<SpiralType, (params: SpiralParams) => TypedSpiralPoints>> = {
+  uzumaki: generateUzumakiTyped,
+  curlicue: generateCurlicueTyped,
+  theodorus: generateTheodorusTyped,
+  vogel: generateVogelTyped,
+};
+
+/**
+ * Generate spiral points as TypedArray for efficient Web Worker transfer.
+ * Uses Float32Array with interleaved x,y coordinates.
+ */
+export function generateSpiralTyped(params: SpiralParams): TypedSpiralPoints {
+  const zoom = params.zoom ?? 1;
+  const panX = params.panX ?? 0;
+  const panY = params.panY ?? 0;
+
+  const generator = TYPED_SPIRAL_GENERATORS[params.type] ?? generatePolarSpiralTyped;
+  const points = generator(params);
+
+  applyTransformationsTyped(points, zoom, panX, panY);
+  return points;
+}
