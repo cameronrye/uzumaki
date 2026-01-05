@@ -26,6 +26,8 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
   const [useWorker, setUseWorker] = useState(true);
   const workerInitializedRef = useRef(false);
   const dimensionsRef = useRef({ width: 0, height: 0 });
+  // Track if canvas control has been transferred (before worker confirms ready)
+  const [canvasTransferred, setCanvasTransferred] = useState(false);
 
   // Use params for zoom/pan - single source of truth from parent
   const currentZoom = params.zoom ?? 1;
@@ -58,6 +60,8 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
       const success = initOffscreenCanvas(canvas);
       if (success) {
         workerInitializedRef.current = true;
+        // Mark canvas as transferred immediately to prevent getContext calls
+        setCanvasTransferred(true);
         // Store dimensions for worker
         const rect = canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
@@ -83,7 +87,8 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     };
 
     // Only set up 2D context for fallback (non-offscreen) mode
-    if (!isOffscreenMode) {
+    // Check canvasTransferred to prevent getContext on transferred canvas
+    if (!isOffscreenMode && !canvasTransferred) {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -124,7 +129,7 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
         clearTimeout(resizeTimeout);
       };
     }
-  }, [isOffscreenMode]);
+  }, [isOffscreenMode, canvasTransferred]);
 
   // Draw spiral - uses Web Worker with OffscreenCanvas when available, falls back to main thread
   useEffect(() => {
@@ -139,6 +144,9 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
       }
       return;
     }
+
+    // If canvas has been transferred but worker not ready yet, skip main thread rendering
+    if (canvasTransferred) return;
 
     // Fallback: render on main thread with batched operations
     const ctx = canvas.getContext('2d');
@@ -201,7 +209,7 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     }
 
     ctx.setLineDash([]);
-  }, [params, currentPanX, currentPanY, colorPresetData, isOffscreenMode, workerReady, requestRender]);
+  }, [params, currentPanX, currentPanY, colorPresetData, isOffscreenMode, workerReady, requestRender, canvasTransferred]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
