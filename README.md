@@ -36,7 +36,7 @@
 - Keyboard shortcuts for quick control
 - Progressive Web App (PWA) support
 
-## Gallery
+## Showcase
 
 <table>
   <tr>
@@ -52,6 +52,107 @@
     <td align="center"><img src="assets/screenshots/colors/neon.png" width="400"><br><strong>Neon Colors</strong></td>
   </tr>
 </table>
+
+## Spiral Mathematics
+
+Each spiral type follows a specific mathematical formula. Most use polar coordinates where `r` is the radius and `theta` is the angle.
+
+### Mathematical Constants
+
+| Constant | Symbol | Value | Description |
+| -------- | ------ | ----- | ----------- |
+| Golden Ratio | phi | (1 + sqrt(5)) / 2 | Approximately 1.618 |
+| Golden Angle | - | 137.5 degrees | 360 / phi^2, optimal packing angle |
+| Euler's Number | e | 2.71828... | Base of natural logarithm |
+
+### Polar Coordinate Spirals
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/spirals/archimedean.png" width="300"><br>
+      <strong>Archimedean Spiral</strong><br>
+      <code>r = a + b * theta</code><br>
+      <em>Constant spacing between turns. Named after Archimedes who first described it circa 225 BC.</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/spirals/fibonacci.png" width="300"><br>
+      <strong>Fibonacci (Golden) Spiral</strong><br>
+      <code>r = a * phi^(2 * theta / pi)</code><br>
+      <em>Self-similar spiral based on the golden ratio. Found in nautilus shells and galaxies.</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="assets/screenshots/spirals/fermat.png" width="300"><br>
+      <strong>Fermat Spiral</strong><br>
+      <code>r = a * sqrt(theta)</code><br>
+      <em>Parabolic spiral where area swept is proportional to angle. Used in optics.</em>
+    </td>
+    <td align="center">
+      <img src="assets/screenshots/spirals/logarithmic.png" width="300"><br>
+      <strong>Logarithmic Spiral</strong><br>
+      <code>r = a * e^(b * theta)</code><br>
+      <em>Self-similar at any scale. Also called equiangular spiral. Seen in hurricanes.</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="assets/screenshots/spirals/hyperbolic.png" width="300"><br>
+      <strong>Hyperbolic Spiral</strong><br>
+      <code>r = a / theta</code><br>
+      <em>Approaches a point asymptotically. The inverse of the Archimedean spiral.</em>
+    </td>
+    <td align="center">
+      <img src="assets/screenshots/spirals/lituus.png" width="300"><br>
+      <strong>Lituus Spiral</strong><br>
+      <code>r = a / sqrt(theta)</code><br>
+      <em>Named for its trumpet-like shape (lituus = Roman curved trumpet).</em>
+    </td>
+  </tr>
+</table>
+
+### Special Construction Spirals
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/spirals/theodorus.png" width="300"><br>
+      <strong>Spiral of Theodorus</strong><br>
+      <code>angle_n = sum(arctan(1 / sqrt(k))) for k=1..n</code><br>
+      <em>Constructed from right triangles with hypotenuse sqrt(n). Demonstrates irrationality of square roots.</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="assets/screenshots/spirals/vogel.png" width="300"><br>
+      <strong>Vogel Spiral (Phyllotaxis)</strong><br>
+      <code>theta_n = n * 137.5 deg, r_n = c * sqrt(n)</code><br>
+      <em>Models sunflower seed arrangement. Uses golden angle for optimal packing.</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="assets/screenshots/spirals/curlicue.png" width="300"><br>
+      <strong>Curlicue Fractal</strong><br>
+      <code>phi_n = 2 * pi * s * n^2</code><br>
+      <em>Where s is irrational (phi). Cumulative angle sums create fractal patterns.</em>
+    </td>
+    <td align="center">
+      <img src="assets/screenshots/spirals/uzumaki.png" width="300"><br>
+      <strong>Uzumaki Spiral</strong><br>
+      <code>Custom chaotic formula</code><br>
+      <em>Inspired by the manga. Time-varying amplitude with sinusoidal modulation.</em>
+    </td>
+  </tr>
+</table>
+
+### Spirals in Nature
+
+| Spiral Type | Natural Examples |
+| ----------- | ---------------- |
+| Fibonacci / Logarithmic | Nautilus shells, galaxy arms, hurricane formations |
+| Vogel / Fermat | Sunflower seeds, pinecones, flower petals |
+| Archimedean | Watch springs, rolled paper, coiled ropes |
+| Theodorus | Mathematical construction, no direct natural analog |
 
 ## Getting Started
 
