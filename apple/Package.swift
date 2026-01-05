@@ -14,9 +14,9 @@ let package = Package(
             name: "UzumakiCore",
             targets: ["UzumakiCore"]
         ),
-        .executable(
-            name: "Uzumaki",
-            targets: ["Uzumaki"]
+        .library(
+            name: "UzumakiUI",
+            targets: ["UzumakiUI"]
         )
     ],
     targets: [
@@ -25,11 +25,12 @@ let package = Package(
             name: "UzumakiCore",
             path: "Sources/UzumakiCore"
         ),
-        // Main app executable
-        .executableTarget(
-            name: "Uzumaki",
+        // UI library with views, view models, and utilities
+        .target(
+            name: "UzumakiUI",
             dependencies: ["UzumakiCore"],
-            path: "Sources/Uzumaki"
+            path: "Sources/Uzumaki",
+            exclude: ["UzumakiApp.swift"]
         ),
         // Tests for core logic
         .testTarget(
