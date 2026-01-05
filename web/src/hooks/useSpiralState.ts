@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useRef } from 'react';
+import { useReducer, useMemo, useRef } from 'react';
 import {
   SpiralType,
   ColorPreset,
@@ -216,75 +216,76 @@ export function useSpiralState(): [SpiralState, SpiralActions] {
   const urlState = useRef(decodeStateFromURL());
   const [state, dispatch] = useReducer(spiralReducer, urlState.current, createInitialState);
 
-  const actions: SpiralActions = {
-    setSpiralType: useCallback((type: SpiralType) => {
+  // Memoize actions object to prevent infinite loops when used in effect dependencies
+  const actions: SpiralActions = useMemo(() => ({
+    setSpiralType: (type: SpiralType) => {
       dispatch({ type: 'SET_SPIRAL_TYPE', payload: type });
-    }, []),
-    setSpinRate: useCallback((rate: number) => {
+    },
+    setSpinRate: (rate: number) => {
       dispatch({ type: 'SET_SPIN_RATE', payload: rate });
-    }, []),
-    setTightness: useCallback((value: number) => {
+    },
+    setTightness: (value: number) => {
       dispatch({ type: 'SET_TIGHTNESS', payload: value });
-    }, []),
-    setStepSize: useCallback((value: number) => {
+    },
+    setStepSize: (value: number) => {
       dispatch({ type: 'SET_STEP_SIZE', payload: value });
-    }, []),
-    setNumSteps: useCallback((value: number) => {
+    },
+    setNumSteps: (value: number) => {
       dispatch({ type: 'SET_NUM_STEPS', payload: value });
-    }, []),
-    setColorPreset: useCallback((preset: ColorPreset) => {
+    },
+    setColorPreset: (preset: ColorPreset) => {
       dispatch({ type: 'SET_COLOR_PRESET', payload: preset });
-    }, []),
-    setLineStyle: useCallback((style: LineStyle) => {
+    },
+    setLineStyle: (style: LineStyle) => {
       dispatch({ type: 'SET_LINE_STYLE', payload: style });
-    }, []),
-    setBackgroundStyle: useCallback((style: BackgroundStyle) => {
+    },
+    setBackgroundStyle: (style: BackgroundStyle) => {
       dispatch({ type: 'SET_BACKGROUND_STYLE', payload: style });
-    }, []),
-    setPerformanceMode: useCallback((enabled: boolean) => {
+    },
+    setPerformanceMode: (enabled: boolean) => {
       dispatch({ type: 'SET_PERFORMANCE_MODE', payload: enabled });
-    }, []),
-    setLineThicknessVariation: useCallback((enabled: boolean) => {
+    },
+    setLineThicknessVariation: (enabled: boolean) => {
       dispatch({ type: 'SET_LINE_THICKNESS_VARIATION', payload: enabled });
-    }, []),
-    setZoom: useCallback((zoom: number) => {
+    },
+    setZoom: (zoom: number) => {
       dispatch({ type: 'SET_ZOOM', payload: zoom });
-    }, []),
-    setPan: useCallback((panX: number, panY: number) => {
+    },
+    setPan: (panX: number, panY: number) => {
       dispatch({ type: 'SET_PAN', payload: { panX, panY } });
-    }, []),
-    incrementTime: useCallback((delta: number) => {
+    },
+    incrementTime: (delta: number) => {
       dispatch({ type: 'INCREMENT_TIME', payload: delta });
-    }, []),
-    togglePause: useCallback(() => {
+    },
+    togglePause: () => {
       dispatch({ type: 'TOGGLE_PAUSE' });
-    }, []),
-    setViewportScale: useCallback((scale: number) => {
+    },
+    setViewportScale: (scale: number) => {
       dispatch({ type: 'SET_VIEWPORT_SCALE', payload: scale });
-    }, []),
-    setShowOnboarding: useCallback((show: boolean) => {
+    },
+    setShowOnboarding: (show: boolean) => {
       dispatch({ type: 'SET_SHOW_ONBOARDING', payload: show });
-    }, []),
-    setShowShortcuts: useCallback((show: boolean) => {
+    },
+    setShowShortcuts: (show: boolean) => {
       dispatch({ type: 'SET_SHOW_SHORTCUTS', payload: show });
-    }, []),
-    toggleShowShortcuts: useCallback(() => {
+    },
+    toggleShowShortcuts: () => {
       dispatch({ type: 'TOGGLE_SHOW_SHORTCUTS' });
-    }, []),
-    setToast: useCallback((message: string | null) => {
+    },
+    setToast: (message: string | null) => {
       dispatch({ type: 'SET_TOAST', payload: message });
-    }, []),
-    loadPreset: useCallback((preset: SpiralPreset) => {
+    },
+    loadPreset: (preset: SpiralPreset) => {
       dispatch({ type: 'LOAD_PRESET', payload: preset });
-    }, []),
-    reset: useCallback(() => {
+    },
+    reset: () => {
       dispatch({ type: 'RESET' });
       window.history.replaceState({}, '', window.location.pathname);
-    }, []),
-    adjustSpinRate: useCallback((delta: number) => {
+    },
+    adjustSpinRate: (delta: number) => {
       dispatch({ type: 'ADJUST_SPIN_RATE', payload: delta });
-    }, []),
-  };
+    },
+  }), []);
 
   return [state, actions];
 }

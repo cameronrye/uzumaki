@@ -20,12 +20,18 @@ export interface UseSpiralWorkerResult {
   isOffscreenMode: boolean;
   /** Whether the worker is ready */
   isReady: boolean;
+  /** Whether the worker has been created (but may not be ready yet) */
+  isWorkerCreated: boolean;
   /** Request the worker to render (OffscreenCanvas mode) */
   requestRender: (params: SpiralParams, width: number, height: number) => void;
-  /** Initialize with an OffscreenCanvas */
+  /** Initialize with an OffscreenCanvas. Returns true if transfer succeeded. */
   initOffscreenCanvas: (canvas: HTMLCanvasElement) => boolean;
   /** Check if worker is supported */
   isSupported: boolean;
+  /** Whether canvas control was transferred (even if worker setup failed after) */
+  isCanvasTransferred: boolean;
+  /** Synchronous check if canvas has been transferred (for use before state updates) */
+  checkCanvasTransferred: () => boolean;
 }
 
 /**
@@ -35,10 +41,14 @@ export function useSpiralWorker(
   options: UseSpiralWorkerOptions = {}
 ): UseSpiralWorkerResult {
   const { useOffscreenCanvas = true, onRenderComplete } = options;
-  
+
   const workerRef = useRef<Worker | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isWorkerCreated, setIsWorkerCreated] = useState(false);
   const [isOffscreenMode, setIsOffscreenMode] = useState(false);
+  const [isCanvasTransferred, setIsCanvasTransferred] = useState(false);
+  // Sync ref to track transfer immediately (state updates are async)
+  const isCanvasTransferredRef = useRef(false);
   const pendingRenderRef = useRef<{ params: SpiralParams; width: number; height: number } | null>(null);
   const isRenderingRef = useRef(false);
 
@@ -55,6 +65,7 @@ export function useSpiralWorker(
         new URL('../workers/spiralWorker.ts', import.meta.url),
         { type: 'module' }
       );
+      setIsWorkerCreated(true);
 
       workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const { type } = e.data;
@@ -87,11 +98,13 @@ export function useSpiralWorker(
       workerRef.current.onerror = (error) => {
         console.warn('Spiral worker error, falling back to main thread:', error);
         setIsReady(false);
+        setIsWorkerCreated(false);
         setIsOffscreenMode(false);
       };
 
     } catch (error) {
       console.warn('Failed to create spiral worker:', error);
+      setIsWorkerCreated(false);
     }
 
     return () => {
@@ -141,6 +154,12 @@ export function useSpiralWorker(
 
     try {
       const offscreen = canvas.transferControlToOffscreen();
+      // CRITICAL: Mark as transferred immediately after the transfer call succeeds
+      // This is irreversible - once transferred, getContext() will always fail
+      // Use ref for synchronous check (state updates are async and can cause race conditions)
+      isCanvasTransferredRef.current = true;
+      setIsCanvasTransferred(true);
+
       const message: WorkerMessage = {
         type: 'init',
         canvas: offscreen,
@@ -153,12 +172,18 @@ export function useSpiralWorker(
     }
   }, [canUseOffscreen]);
 
+  // Synchronous check for canvas transfer (for use in effects before state updates)
+  const checkCanvasTransferred = useCallback(() => isCanvasTransferredRef.current, []);
+
   return {
     isOffscreenMode,
     isReady,
+    isWorkerCreated,
     requestRender,
     initOffscreenCanvas,
     isSupported,
+    isCanvasTransferred,
+    checkCanvasTransferred,
   };
 }
 

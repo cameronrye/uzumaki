@@ -26,8 +26,6 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
   const [useWorker, setUseWorker] = useState(true);
   const workerInitializedRef = useRef(false);
   const dimensionsRef = useRef({ width: 0, height: 0 });
-  // Track if canvas control has been transferred (before worker confirms ready)
-  const [canvasTransferred, setCanvasTransferred] = useState(false);
 
   // Use params for zoom/pan - single source of truth from parent
   const currentZoom = params.zoom ?? 1;
@@ -43,36 +41,47 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
   const {
     isOffscreenMode,
     isReady: workerReady,
+    isWorkerCreated,
     requestRender,
     initOffscreenCanvas,
     isSupported: workerSupported,
+    isCanvasTransferred,
+    checkCanvasTransferred,
   } = useSpiralWorker({
     useOffscreenCanvas: useWorker && supportsOffscreenCanvas(),
   });
 
-  // Initialize OffscreenCanvas with worker (only once)
+  // Keep a ref to the latest initOffscreenCanvas to avoid dependency issues
+  const initOffscreenCanvasRef = useRef(initOffscreenCanvas);
+  initOffscreenCanvasRef.current = initOffscreenCanvas;
+
+  // Initialize OffscreenCanvas with worker (only once, after worker is created)
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !workerSupported || workerInitializedRef.current) return;
+    // Skip if already transferred - canvas control transfer is irreversible
+    // Use synchronous ref check to prevent race conditions
+    if (!canvas || !workerSupported || isCanvasTransferred || checkCanvasTransferred()) return;
+    // Skip if we've already successfully initialized
+    if (workerInitializedRef.current) return;
+    // Wait for worker to be created before attempting canvas transfer
+    if (!isWorkerCreated) return;
 
     // Try to initialize OffscreenCanvas rendering
     if (supportsOffscreenCanvas()) {
-      const success = initOffscreenCanvas(canvas);
+      const success = initOffscreenCanvasRef.current(canvas);
       if (success) {
         workerInitializedRef.current = true;
-        // Mark canvas as transferred immediately to prevent getContext calls
-        setCanvasTransferred(true);
         // Store dimensions for worker
         const rect = canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         dimensionsRef.current = { width: rect.width * dpr, height: rect.height * dpr };
-      } else {
-        setUseWorker(false);
       }
+      // If init fails, don't disable worker mode - something else is wrong
     } else {
+      // OffscreenCanvas not supported, fall back to main thread
       setUseWorker(false);
     }
-  }, [workerSupported, initOffscreenCanvas]);
+  }, [workerSupported, isCanvasTransferred, checkCanvasTransferred, isWorkerCreated]);
 
   // Handle canvas resize (fallback mode only - worker handles its own canvas)
   useEffect(() => {
@@ -87,8 +96,8 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     };
 
     // Only set up 2D context for fallback (non-offscreen) mode
-    // Check canvasTransferred to prevent getContext on transferred canvas
-    if (!isOffscreenMode && !canvasTransferred) {
+    // Use synchronous check to prevent getContext on transferred canvas (state updates are async)
+    if (!isOffscreenMode && !isCanvasTransferred && !checkCanvasTransferred()) {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -129,7 +138,7 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
         clearTimeout(resizeTimeout);
       };
     }
-  }, [isOffscreenMode, canvasTransferred]);
+  }, [isOffscreenMode, isCanvasTransferred, checkCanvasTransferred]);
 
   // Draw spiral - uses Web Worker with OffscreenCanvas when available, falls back to main thread
   useEffect(() => {
@@ -146,7 +155,8 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     }
 
     // If canvas has been transferred but worker not ready yet, skip main thread rendering
-    if (canvasTransferred) return;
+    // Use synchronous check to prevent getContext on transferred canvas (state updates are async)
+    if (isCanvasTransferred || checkCanvasTransferred()) return;
 
     // Fallback: render on main thread with batched operations
     const ctx = canvas.getContext('2d');
@@ -209,7 +219,7 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     }
 
     ctx.setLineDash([]);
-  }, [params, currentPanX, currentPanY, colorPresetData, isOffscreenMode, workerReady, requestRender, canvasTransferred]);
+  }, [params, currentPanX, currentPanY, colorPresetData, isOffscreenMode, workerReady, requestRender, isCanvasTransferred, checkCanvasTransferred]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
