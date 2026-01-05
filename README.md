@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  An interactive spiral visualization app built with React and TypeScript.
+  An interactive spiral visualization app for Web, iOS, and macOS.
 </p>
 
 <p align="center">
@@ -13,7 +13,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white" alt="React 19">
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
+  <img src="https://img.shields.io/badge/SwiftUI-5-007AFF?logo=swift&logoColor=white" alt="SwiftUI">
   <img src="https://img.shields.io/badge/PWA-Ready-5a0fc8?logo=pwa&logoColor=white" alt="PWA Ready">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
 </p>
@@ -156,34 +157,85 @@ Each spiral type follows a specific mathematical formula. Most use polar coordin
 
 ## Getting Started
 
-### Prerequisites
+### Web App
+
+#### Prerequisites
 
 - Node.js 18+
 - npm or yarn
 
-### Installation
+#### Installation
 
 ```bash
+cd web
 npm install
 ```
 
-### Development
+#### Development
 
 ```bash
 npm run dev
 ```
 
-### Build
+#### Build
 
 ```bash
 npm run build
 ```
 
-### Preview Production Build
+#### Preview Production Build
 
 ```bash
 npm run preview
 ```
+
+### Apple App (iOS / macOS)
+
+A native SwiftUI implementation with the same features as the web app.
+
+#### Prerequisites
+
+- macOS 14.0+
+- Xcode 16+ (for development)
+- Swift 6.0+
+
+#### Build and Run
+
+Using Swift Package Manager:
+
+```bash
+cd apple
+swift build
+swift run Uzumaki
+```
+
+Or open in Xcode:
+
+```bash
+cd apple
+open Package.swift
+```
+
+Then select the `Uzumaki` scheme and run (Cmd+R).
+
+#### Run Tests
+
+```bash
+cd apple
+swift test
+```
+
+#### Features
+
+- Native SwiftUI Canvas rendering
+- SIMD-optimized spiral generation
+- All 8 spiral types from the web app
+- All 10 color presets
+- Play/pause animation with TimelineView
+- Pinch-to-zoom and pan gestures
+- PNG export
+- Keyboard shortcuts (Space, R, E)
+- macOS menu bar integration
 
 ## Keyboard Shortcuts
 
@@ -199,10 +251,19 @@ npm run preview
 
 ## Tech Stack
 
+### Web
+
 - React 19
 - TypeScript
 - Vite
 - Canvas API
+
+### Apple
+
+- Swift 6
+- SwiftUI
+- Swift Package Manager
+- SIMD for optimized math
 
 ## License
 
