@@ -3,6 +3,7 @@ import {
   createTypedPoints,
   setPoint,
   applyTransformationsTyped,
+  toPointArray,
 } from './spiralTypedArrays';
 
 export type SpiralType =
@@ -22,8 +23,9 @@ export interface SpiralPoint {
   y: number;
 }
 
-// Re-export TypedSpiralPoints for consumers
+// Re-export TypedSpiralPoints and PointAccessor for consumers
 export type { TypedSpiralPoints } from './spiralTypedArrays';
+export { fromPointArray, fromTypedPoints, type PointAccessor } from './canvasRenderers';
 
 export interface SpiralParams {
   type: SpiralType;
@@ -136,151 +138,12 @@ function calculateRadius(theta: number, params: SpiralParams): number {
   }
 }
 
-// Generate standard polar spiral points
-function generatePolarSpiral(params: SpiralParams): SpiralPoint[] {
-  const { spinRate, stepSize, numSteps, time } = params;
-  const points: SpiralPoint[] = [];
-  const rotation = time * spinRate;
-
-  for (let i = 0; i < numSteps; i++) {
-    const theta = i * stepSize + rotation;
-    const r = calculateRadius(i * stepSize, params);
-    points.push({
-      x: r * Math.cos(theta),
-      y: r * Math.sin(theta),
-    });
-  }
-  return points;
-}
-
-// Theodorus spiral (square root spiral) - each segment has length 1,
-// creating right triangles with hypotenuse √n
-// Returns points for the spiral outline, with extra metadata for triangle rendering
-function generateTheodorus(params: SpiralParams): SpiralPoint[] {
-  const { tightness, numSteps, time, viewportScale, spinRate } = params;
-  const points: SpiralPoint[] = [];
-  const scale = tightness * 3 * viewportScale;
-  const rotation = time * spinRate;
-
-  let x = 0, y = 0;
-  let angle = rotation;
-
-  // Add center point first (origin of all triangles)
-  points.push({ x: 0, y: 0 });
-
-  for (let n = 1; n <= numSteps; n++) {
-    // Each step turns by arctan(1/√n)
-    angle += Math.atan(1 / Math.sqrt(n));
-    // Move one unit in the current direction
-    x += Math.cos(angle);
-    y += Math.sin(angle);
-    points.push({ x: x * scale, y: y * scale });
-  }
-  return points;
-}
-
-// Vogel spiral (phyllotaxis) - models sunflower seed arrangement
-function generateVogel(params: SpiralParams): SpiralPoint[] {
-  const { tightness, numSteps, time, viewportScale, spinRate } = params;
-  const points: SpiralPoint[] = [];
-  const scale = tightness * viewportScale;
-  const rotation = time * spinRate;
-
-  for (let n = 0; n < numSteps; n++) {
-    // Vogel's formula: θ = n × golden angle, r = c × √n
-    const theta = n * GOLDEN_ANGLE + rotation;
-    const r = scale * Math.sqrt(n) * 2;
-    points.push({
-      x: r * Math.cos(theta),
-      y: r * Math.sin(theta),
-    });
-  }
-  return points;
-}
-
-// Uzumaki spiral - custom chaotic formula from README
-function generateUzumaki(params: SpiralParams): SpiralPoint[] {
-  const { tightness, numSteps, time, viewportScale } = params;
-  const points: SpiralPoint[] = [];
-
-  for (let n = 1; n <= numSteps; n++) {
-    const scale = Math.pow(n, 1.5) / (n + 1000) * tightness * 10 * viewportScale;
-    const angle = 0.1 * n * Math.sin(83.3333 * time * 0.01);
-    const spiral = 0.1 * n * time * 0.1;
-
-    points.push({
-      x: scale * Math.sin(angle + spiral),
-      y: scale * Math.cos(angle + spiral),
-    });
-  }
-  return points;
-}
-
-// Curlicue fractal - Based on Wolfram MathWorld definition
-// Uses θₙ = 2πsn² (simplified form) for proper fractal behavior
-function generateCurlicue(params: SpiralParams): SpiralPoint[] {
-  const { tightness, numSteps, time, viewportScale } = params;
-  const points: SpiralPoint[] = [];
-  const s = PHI; // Golden ratio as irrational number
-
-  let x = 0, y = 0;
-  const segmentLength = tightness * 0.5 * viewportScale;
-  const timeOffset = time * 0.1;
-
-  // Curlicue: walk unit steps at angles determined by quadratic irrational
-  // The angle at step n is: Φₙ = 2πs × n² (mod 2π gives the fractal nature)
-  for (let n = 0; n < numSteps; n++) {
-    points.push({ x, y });
-
-    // Φₙ = 2πs × n² + time offset for animation
-    // The n² term creates the characteristic curlicue fractal pattern
-    const phi = 2 * Math.PI * s * n * n + timeOffset;
-
-    // Draw segment at angle Φₙ
-    x += segmentLength * Math.cos(phi);
-    y += segmentLength * Math.sin(phi);
-  }
-  return points;
-}
-
-// Spiral generator function type
-type SpiralGenerator = (params: SpiralParams) => SpiralPoint[];
-
-// Dispatch map for spiral generators - makes adding new spirals easy
-const SPIRAL_GENERATORS: Partial<Record<SpiralType, SpiralGenerator>> = {
-  uzumaki: generateUzumaki,
-  curlicue: generateCurlicue,
-  theodorus: generateTheodorus,
-  vogel: generateVogel,
-};
-
-// Apply zoom and pan transformations to points
-function applyTransformations(
-  points: SpiralPoint[],
-  zoom: number,
-  panX: number,
-  panY: number
-): SpiralPoint[] {
-  if (zoom === 1 && panX === 0 && panY === 0) {
-    return points;
-  }
-  return points.map(p => ({
-    x: p.x * zoom + panX,
-    y: p.y * zoom + panY,
-  }));
-}
-
-// Main function to generate spiral points
+/**
+ * Main function to generate spiral points as SpiralPoint[].
+ * Uses typed generators internally and converts for backward compatibility.
+ */
 export function generateSpiral(params: SpiralParams): SpiralPoint[] {
-  const zoom = params.zoom ?? 1;
-  const panX = params.panX ?? 0;
-  const panY = params.panY ?? 0;
-
-  // Use dispatch map, fallback to polar spiral for standard types
-  const generator = SPIRAL_GENERATORS[params.type] ?? generatePolarSpiral;
-  const points = generator(params);
-
-  return applyTransformations(points, zoom, panX, panY);
+  return toPointArray(generateSpiralTyped(params));
 }
 
 // Preset configurations for interesting spiral patterns

@@ -61,6 +61,19 @@ export function toTypedPoints(
 }
 
 /**
+ * Convert TypedSpiralPoints to regular point array
+ */
+export function toPointArray(
+  typed: TypedSpiralPoints
+): Array<{ x: number; y: number }> {
+  const points: Array<{ x: number; y: number }> = new Array(typed.length);
+  for (let i = 0; i < typed.length; i++) {
+    points[i] = { x: getX(typed, i), y: getY(typed, i) };
+  }
+  return points;
+}
+
+/**
  * Apply zoom and pan transformations in-place (mutates the array)
  */
 export function applyTransformationsTyped(

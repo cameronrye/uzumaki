@@ -4,7 +4,15 @@
  */
 
 import { SpiralParams, generateSpiralTyped, COLOR_PRESETS } from '../utils/spirals';
-import { TypedSpiralPoints, getX, getY } from '../utils/spiralTypedArrays';
+import { TypedSpiralPoints } from '../utils/spiralTypedArrays';
+import {
+  fromTypedPoints,
+  drawPointsBatched,
+  drawGlow,
+  drawLine,
+  getLineDashPattern,
+  RenderContext,
+} from '../utils/canvasRenderers';
 
 // Message types for worker communication
 export interface WorkerMessage {
@@ -33,7 +41,7 @@ function initCanvas(canvas: OffscreenCanvas): void {
 }
 
 /**
- * Render spiral directly to OffscreenCanvas
+ * Render spiral directly to OffscreenCanvas using shared renderers
  */
 function renderToCanvas(
   points: TypedSpiralPoints,
@@ -70,150 +78,36 @@ function renderToCanvas(
   ctx.lineJoin = 'round';
 
   const lineStyle = params.lineStyle || 'solid';
-  switch (lineStyle) {
-    case 'dashed':
-      ctx.setLineDash([10, 5]);
-      break;
-    case 'dotted':
-      ctx.setLineDash([2, 4]);
-      break;
-    default:
-      ctx.setLineDash([]);
-  }
+  ctx.setLineDash(getLineDashPattern(lineStyle) as number[]);
 
   const isGlowOnly = lineStyle === 'glow';
   const isPointsMode = lineStyle === 'points';
-  const isPerformanceMode = params.performanceMode;
+
+  // Create unified render context for shared renderers
+  const renderContext: RenderContext<OffscreenCanvasRenderingContext2D> = {
+    ctx,
+    centerX,
+    centerY,
+    points: fromTypedPoints(points),
+    colors,
+    gradient,
+    zoom: params.zoom ?? 1,
+    isPerformanceMode: params.performanceMode ?? false,
+    hasThicknessVariation: params.lineThicknessVariation ?? false,
+  };
 
   if (isPointsMode) {
-    // Batched points rendering
-    renderPointsBatched(ctx, points, colors, centerX, centerY, params.zoom ?? 1);
+    drawPointsBatched(renderContext);
   } else {
-    // Draw glow if needed
-    if (!isPerformanceMode || isGlowOnly) {
-      renderGlow(ctx, points, colors, centerX, centerY, isGlowOnly, isPerformanceMode);
+    if (!renderContext.isPerformanceMode || isGlowOnly) {
+      drawGlow(renderContext, isGlowOnly);
     }
-
-    // Draw main line
     if (!isGlowOnly) {
-      renderLine(ctx, points, gradient, centerX, centerY, params.lineThicknessVariation);
+      drawLine(renderContext);
     }
   }
 
   ctx.setLineDash([]);
-}
-
-/**
- * Render points with batching by color
- */
-function renderPointsBatched(
-  ctx: OffscreenCanvasRenderingContext2D,
-  points: TypedSpiralPoints,
-  colors: string[],
-  centerX: number,
-  centerY: number,
-  zoom: number
-): void {
-  const pointRadius = Math.max(1.5, 3 * zoom);
-  const numColors = colors.length;
-  const pointsPerColor = Math.ceil(points.length / numColors);
-
-  for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
-    ctx.fillStyle = colors[colorIdx];
-    ctx.beginPath();
-
-    const startIdx = colorIdx * pointsPerColor;
-    const endIdx = Math.min((colorIdx + 1) * pointsPerColor, points.length);
-
-    for (let i = startIdx; i < endIdx; i++) {
-      const x = centerX + getX(points, i);
-      const y = centerY + getY(points, i);
-      ctx.moveTo(x + pointRadius, y);
-      ctx.arc(x, y, pointRadius, 0, Math.PI * 2);
-    }
-
-    ctx.fill();
-  }
-}
-
-/**
- * Render glow effect layers
- */
-function renderGlow(
-  ctx: OffscreenCanvasRenderingContext2D,
-  points: TypedSpiralPoints,
-  colors: string[],
-  centerX: number,
-  centerY: number,
-  isGlowOnly: boolean,
-  isPerformanceMode: boolean | undefined
-): void {
-  const glowColor = colors[2] || colors[0];
-  const glowLayers = isPerformanceMode
-    ? [{ width: 8, opacity: 0.2 }]
-    : [
-        { width: 12, opacity: 0.1 },
-        { width: 8, opacity: 0.15 },
-        { width: 5, opacity: 0.2 },
-      ];
-
-  for (const layer of glowLayers) {
-    ctx.beginPath();
-    ctx.moveTo(centerX + getX(points, 0), centerY + getY(points, 0));
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(centerX + getX(points, i), centerY + getY(points, i));
-    }
-    ctx.strokeStyle = glowColor;
-    ctx.globalAlpha = isGlowOnly ? layer.opacity * 2 : layer.opacity;
-    ctx.lineWidth = isGlowOnly ? layer.width * 1.5 : layer.width;
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-}
-
-/**
- * Render main spiral line with optional thickness variation
- */
-function renderLine(
-  ctx: OffscreenCanvasRenderingContext2D,
-  points: TypedSpiralPoints,
-  gradient: CanvasGradient,
-  centerX: number,
-  centerY: number,
-  hasThicknessVariation: boolean | undefined
-): void {
-  ctx.strokeStyle = gradient;
-
-  if (hasThicknessVariation) {
-    // Batch segments by width buckets
-    const bucketCount = 10;
-    const segmentsPerBucket = Math.ceil(points.length / bucketCount);
-
-    for (let bucket = 0; bucket < bucketCount; bucket++) {
-      const startIdx = bucket * segmentsPerBucket;
-      const endIdx = Math.min((bucket + 1) * segmentsPerBucket, points.length);
-      const midProgress = (startIdx + endIdx) / 2 / points.length;
-
-      ctx.beginPath();
-      ctx.lineWidth = 1 + midProgress * 3;
-
-      if (startIdx < points.length) {
-        ctx.moveTo(centerX + getX(points, startIdx), centerY + getY(points, startIdx));
-        for (let i = startIdx + 1; i < endIdx; i++) {
-          ctx.lineTo(centerX + getX(points, i), centerY + getY(points, i));
-        }
-        ctx.stroke();
-      }
-    }
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(centerX + getX(points, 0), centerY + getY(points, 0));
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(centerX + getX(points, i), centerY + getY(points, i));
-    }
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
 }
 
 // Worker message handler

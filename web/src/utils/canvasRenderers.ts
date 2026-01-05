@@ -1,4 +1,3 @@
-import { SpiralPoint } from './spirals';
 import {
   GLOW_LAYERS_NORMAL,
   GLOW_LAYERS_PERFORMANCE,
@@ -12,12 +11,54 @@ import {
   THICKNESS_VARIATION_RANGE,
   LINE_DASH_PATTERNS,
 } from './constants';
+import { TypedSpiralPoints, getX, getY } from './spiralTypedArrays';
 
-export interface RenderContext {
-  ctx: CanvasRenderingContext2D;
+// Re-export SpiralPoint for backward compatibility
+export interface SpiralPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Unified point accessor interface for rendering functions.
+ * Allows rendering code to work with both SpiralPoint[] and TypedSpiralPoints.
+ */
+export interface PointAccessor {
+  length: number;
+  getX(index: number): number;
+  getY(index: number): number;
+}
+
+/**
+ * Create a PointAccessor from a SpiralPoint array
+ */
+export function fromPointArray(points: SpiralPoint[]): PointAccessor {
+  return {
+    length: points.length,
+    getX: (i: number) => points[i].x,
+    getY: (i: number) => points[i].y,
+  };
+}
+
+/**
+ * Create a PointAccessor from TypedSpiralPoints
+ */
+export function fromTypedPoints(points: TypedSpiralPoints): PointAccessor {
+  return {
+    length: points.length,
+    getX: (i: number) => getX(points, i),
+    getY: (i: number) => getY(points, i),
+  };
+}
+
+// Canvas context type that works with both regular and offscreen canvas
+type AnyCanvasContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+export interface RenderContext<T extends AnyCanvasContext = CanvasRenderingContext2D> {
+  ctx: T;
   centerX: number;
   centerY: number;
-  points: SpiralPoint[];
+  points: PointAccessor;
   colors: string[];
   gradient: CanvasGradient;
   zoom: number;
@@ -26,17 +67,17 @@ export interface RenderContext {
 }
 
 // Draw triangles from center (ideal for Theodorus spiral)
-export function drawTriangles(context: RenderContext): void {
+export function drawTriangles<T extends AnyCanvasContext>(context: RenderContext<T>): void {
   const { ctx, centerX, centerY, points, colors } = context;
-  
+
   ctx.globalAlpha = 1;
   ctx.lineWidth = LINE_WIDTH_TRIANGLES;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
   // First point is the center for Theodorus spiral
-  const originX = centerX + points[0].x;
-  const originY = centerY + points[0].y;
+  const originX = centerX + points.getX(0);
+  const originY = centerY + points.getY(0);
 
   for (let i = 1; i < points.length; i++) {
     const progress = i / points.length;
@@ -47,9 +88,9 @@ export function drawTriangles(context: RenderContext): void {
     ctx.beginPath();
     ctx.moveTo(originX, originY);
     if (i > 1) {
-      ctx.lineTo(centerX + points[i - 1].x, centerY + points[i - 1].y);
+      ctx.lineTo(centerX + points.getX(i - 1), centerY + points.getY(i - 1));
     }
-    ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+    ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
     ctx.lineTo(originX, originY);
     ctx.stroke();
   }
@@ -59,18 +100,18 @@ export function drawTriangles(context: RenderContext): void {
   ctx.lineWidth = LINE_WIDTH_TRIANGLES_OUTER;
   ctx.beginPath();
   if (points.length > 1) {
-    ctx.moveTo(centerX + points[1].x, centerY + points[1].y);
+    ctx.moveTo(centerX + points.getX(1), centerY + points.getY(1));
     for (let i = 2; i < points.length; i++) {
-      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+      ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
     }
   }
   ctx.stroke();
 }
 
-// Draw discrete circles (ideal for Vogel/phyllotaxis patterns)
-export function drawPoints(context: RenderContext): void {
+// Draw discrete circles (ideal for Vogel/phyllotaxis patterns) - non-batched version
+export function drawPoints<T extends AnyCanvasContext>(context: RenderContext<T>): void {
   const { ctx, centerX, centerY, points, colors, zoom } = context;
-  
+
   ctx.globalAlpha = 1;
   const pointRadius = Math.max(POINT_RADIUS_MIN, POINT_RADIUS_BASE * zoom);
 
@@ -87,35 +128,110 @@ export function drawPoints(context: RenderContext): void {
     }
 
     ctx.beginPath();
-    ctx.arc(centerX + points[i].x, centerY + points[i].y, pointRadius, 0, Math.PI * 2);
+    ctx.arc(centerX + points.getX(i), centerY + points.getY(i), pointRadius, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
+// Draw points with batched rendering by color - more efficient
+export function drawPointsBatched<T extends AnyCanvasContext>(context: RenderContext<T>): void {
+  const { ctx, centerX, centerY, points, colors, zoom } = context;
+
+  ctx.globalAlpha = 1;
+  const pointRadius = Math.max(POINT_RADIUS_MIN, POINT_RADIUS_BASE * zoom);
+  const numColors = colors.length;
+  const pointsPerColor = Math.ceil(points.length / numColors);
+
+  for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
+    ctx.fillStyle = colors[colorIdx];
+    ctx.beginPath();
+
+    const startIdx = colorIdx * pointsPerColor;
+    const endIdx = Math.min((colorIdx + 1) * pointsPerColor, points.length);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      const x = centerX + points.getX(i);
+      const y = centerY + points.getY(i);
+      ctx.moveTo(x + pointRadius, y);
+      ctx.arc(x, y, pointRadius, 0, Math.PI * 2);
+    }
+
+    ctx.fill();
+  }
+}
+
+// Draw triangles with batched rendering by color - more efficient
+export function drawTrianglesBatched<T extends AnyCanvasContext>(context: RenderContext<T>): void {
+  const { ctx, centerX, centerY, points, colors } = context;
+
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = LINE_WIDTH_TRIANGLES;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const originX = centerX + points.getX(0);
+  const originY = centerY + points.getY(0);
+  const numColors = colors.length;
+  const trianglesPerColor = Math.ceil((points.length - 1) / numColors);
+
+  // Batch triangles by color
+  for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
+    ctx.strokeStyle = colors[colorIdx];
+    ctx.beginPath();
+
+    const startIdx = colorIdx * trianglesPerColor + 1;
+    const endIdx = Math.min((colorIdx + 1) * trianglesPerColor + 1, points.length);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      ctx.moveTo(originX, originY);
+      if (i > 1) {
+        ctx.lineTo(centerX + points.getX(i - 1), centerY + points.getY(i - 1));
+      }
+      ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
+      ctx.lineTo(originX, originY);
+    }
+
+    ctx.stroke();
+  }
+
+  // Draw outer edge
+  ctx.strokeStyle = colors[0];
+  ctx.lineWidth = LINE_WIDTH_TRIANGLES_OUTER;
+  ctx.beginPath();
+  if (points.length > 1) {
+    ctx.moveTo(centerX + points.getX(1), centerY + points.getY(1));
+    for (let i = 2; i < points.length; i++) {
+      ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
+    }
+  }
+  ctx.stroke();
+}
+
 // Draw glow effect layers
-export function drawGlow(context: RenderContext, isGlowOnly: boolean): void {
+export function drawGlow<T extends AnyCanvasContext>(context: RenderContext<T>, isGlowOnly: boolean): void {
   const { ctx, centerX, centerY, points, colors, isPerformanceMode } = context;
-  
+
   const glowColor = colors[2] || colors[0];
   const glowLayers = isPerformanceMode ? GLOW_LAYERS_PERFORMANCE : GLOW_LAYERS_NORMAL;
 
   for (const layer of glowLayers) {
     ctx.beginPath();
-    ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
+    ctx.moveTo(centerX + points.getX(0), centerY + points.getY(0));
     for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+      ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
     }
     ctx.strokeStyle = glowColor;
     ctx.globalAlpha = isGlowOnly ? layer.opacity * 2 : layer.opacity;
     ctx.lineWidth = isGlowOnly ? layer.width * 1.5 : layer.width;
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 }
 
 // Draw main spiral line with optional thickness variation
-export function drawLine(context: RenderContext): void {
+export function drawLine<T extends AnyCanvasContext>(context: RenderContext<T>): void {
   const { ctx, centerX, centerY, points, gradient, hasThicknessVariation } = context;
-  
+
   ctx.globalAlpha = 1;
   ctx.strokeStyle = gradient;
 
@@ -132,9 +248,9 @@ export function drawLine(context: RenderContext): void {
       ctx.lineWidth = THICKNESS_VARIATION_BASE + midProgress * THICKNESS_VARIATION_RANGE;
 
       if (startIdx < points.length) {
-        ctx.moveTo(centerX + points[startIdx].x, centerY + points[startIdx].y);
+        ctx.moveTo(centerX + points.getX(startIdx), centerY + points.getY(startIdx));
         for (let i = startIdx + 1; i < endIdx; i++) {
-          ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+          ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
         }
         ctx.stroke();
       }
@@ -142,9 +258,9 @@ export function drawLine(context: RenderContext): void {
   } else {
     // Draw with uniform thickness
     ctx.beginPath();
-    ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
+    ctx.moveTo(centerX + points.getX(0), centerY + points.getY(0));
     for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+      ctx.lineTo(centerX + points.getX(i), centerY + points.getY(i));
     }
     ctx.lineWidth = LINE_WIDTH_DEFAULT;
     ctx.stroke();
