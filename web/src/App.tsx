@@ -1,59 +1,25 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { SpiralCanvas } from './components/SpiralCanvas';
 import { Controls } from './components/Controls';
 import { SpiralIcon, MouseIcon } from './components/Icons';
+import { SpiralProvider, useSpiralContext, useBackgroundStyle } from './context/SpiralContext';
+import { copyShareURL, ShareableState } from './utils/urlState';
 import {
-  SpiralType,
-  SpiralParams,
-  ColorPreset,
-  SpiralPreset,
-  LineStyle,
-  BackgroundStyle,
-  COLOR_PRESETS,
-  DEFAULT_ZOOM
-} from './utils/spirals';
-import { decodeStateFromURL, copyShareURL, ShareableState } from './utils/urlState';
+  ANIMATION_FPS_NORMAL,
+  ANIMATION_FPS_PERFORMANCE,
+  TOAST_DURATION_MS,
+  ONBOARDING_AUTO_HIDE_MS,
+  ONBOARDING_FADE_DELAY_MS,
+  RESIZE_DEBOUNCE_MS,
+  VIEWPORT_SCALE_MIN,
+  VIEWPORT_SCALE_MAX,
+  VIEWPORT_BASE_SIZE,
+  SPIN_RATE_KEYBOARD_STEP,
+} from './utils/constants';
 
-// Default values for reset
-const DEFAULTS = {
-  spiralType: 'archimedean' as SpiralType,
-  spinRate: 0.5,
-  tightness: 3,
-  stepSize: 0.1,
-  numSteps: 500,
-  colorPreset: 'rainbow' as ColorPreset,
-  lineStyle: 'solid' as LineStyle,
-  backgroundStyle: 'dark' as BackgroundStyle,
-  performanceMode: false,
-  lineThicknessVariation: false,
-};
-
-function App() {
-  // Load initial state from URL or defaults
-  const urlState = useRef(decodeStateFromURL());
-  const initialSpiralType = urlState.current?.spiralType ?? DEFAULTS.spiralType;
-
-  const [spiralType, setSpiralType] = useState<SpiralType>(initialSpiralType);
-  const [spinRate, setSpinRate] = useState(urlState.current?.spinRate ?? DEFAULTS.spinRate);
-  const [tightness, setTightness] = useState(urlState.current?.tightness ?? DEFAULTS.tightness);
-  const [stepSize, setStepSize] = useState(urlState.current?.stepSize ?? DEFAULTS.stepSize);
-  const [numSteps, setNumSteps] = useState(urlState.current?.numSteps ?? DEFAULTS.numSteps);
-  const [time, setTime] = useState(0);
-  const [viewportScale, setViewportScale] = useState(1);
-  const [isPaused, setIsPaused] = useState(false);
-  const [colorPreset, setColorPreset] = useState<ColorPreset>(urlState.current?.colorPreset ?? DEFAULTS.colorPreset);
-  const [lineStyle, setLineStyle] = useState<LineStyle>(urlState.current?.lineStyle ?? DEFAULTS.lineStyle);
-  const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(urlState.current?.backgroundStyle ?? DEFAULTS.backgroundStyle);
-  const [performanceMode, setPerformanceMode] = useState(urlState.current?.performanceMode ?? DEFAULTS.performanceMode);
-  const [lineThicknessVariation, setLineThicknessVariation] = useState(urlState.current?.lineThicknessVariation ?? DEFAULTS.lineThicknessVariation);
-  const [zoom, setZoom] = useState(urlState.current?.zoom ?? DEFAULT_ZOOM[initialSpiralType]);
-  const [panX, setPanX] = useState(urlState.current?.panX ?? 0);
-  const [panY, setPanY] = useState(urlState.current?.panY ?? 0);
-
-  // UI state
-  const [showOnboarding, setShowOnboarding] = useState(!urlState.current);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+function AppContent() {
+  const { state, actions, params } = useSpiralContext();
+  const dynamicBg = useBackgroundStyle();
 
   const appRef = useRef<HTMLDivElement>(null);
   const hasInteracted = useRef(false);
@@ -67,8 +33,8 @@ function App() {
   useEffect(() => {
     const updateViewportScale = () => {
       const minDimension = Math.min(window.innerWidth, window.innerHeight);
-      const scale = Math.max(0.5, Math.min(2, minDimension / 600));
-      setViewportScale(scale);
+      const scale = Math.max(VIEWPORT_SCALE_MIN, Math.min(VIEWPORT_SCALE_MAX, minDimension / VIEWPORT_BASE_SIZE));
+      actions.setViewportScale(scale);
     };
 
     updateViewportScale();
@@ -76,7 +42,7 @@ function App() {
     let resizeTimeout: number;
     const debouncedResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = window.setTimeout(updateViewportScale, 100);
+      resizeTimeout = window.setTimeout(updateViewportScale, RESIZE_DEBOUNCE_MS);
     };
 
     window.addEventListener('resize', debouncedResize);
@@ -84,22 +50,20 @@ function App() {
       window.removeEventListener('resize', debouncedResize);
       clearTimeout(resizeTimeout);
     };
-  }, []);
+  }, [actions]);
 
   // Animation loop with pause support and frame rate limiting
   useEffect(() => {
-    if (isPaused || prefersReducedMotion.current) return;
+    if (state.isPaused || prefersReducedMotion.current) return;
 
     let animationId: number;
     let lastTime = performance.now();
     let lastFrameTime = 0;
 
-    // Target 60fps in normal mode, 30fps in performance mode
-    const targetFPS = performanceMode ? 30 : 60;
+    const targetFPS = state.performanceMode ? ANIMATION_FPS_PERFORMANCE : ANIMATION_FPS_NORMAL;
     const frameInterval = 1000 / targetFPS;
 
     const animate = (currentTime: number) => {
-      // Frame rate limiting
       const elapsed = currentTime - lastFrameTime;
 
       if (elapsed >= frameInterval) {
@@ -107,7 +71,7 @@ function App() {
         lastTime = currentTime;
         lastFrameTime = currentTime - (elapsed % frameInterval);
 
-        setTime(prev => prev + deltaTime);
+        actions.incrementTime(deltaTime);
       }
 
       animationId = requestAnimationFrame(animate);
@@ -115,16 +79,16 @@ function App() {
 
     animationId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationId);
-  }, [isPaused, performanceMode]);
+  }, [state.isPaused, state.performanceMode, actions]);
 
   // Hide onboarding on first interaction
   useEffect(() => {
-    if (!showOnboarding) return;
+    if (!state.showOnboarding) return;
 
     const handleInteraction = () => {
       if (!hasInteracted.current) {
         hasInteracted.current = true;
-        setTimeout(() => setShowOnboarding(false), 300);
+        setTimeout(() => actions.setShowOnboarding(false), ONBOARDING_FADE_DELAY_MS);
       }
     };
 
@@ -132,8 +96,8 @@ function App() {
     window.addEventListener('wheel', handleInteraction);
     window.addEventListener('touchstart', handleInteraction);
 
-    // Auto-hide after 4 seconds
-    const timeout = setTimeout(() => setShowOnboarding(false), 4000);
+    // Auto-hide after delay
+    const timeout = setTimeout(() => actions.setShowOnboarding(false), ONBOARDING_AUTO_HIDE_MS);
 
     return () => {
       window.removeEventListener('mousedown', handleInteraction);
@@ -141,143 +105,46 @@ function App() {
       window.removeEventListener('touchstart', handleInteraction);
       clearTimeout(timeout);
     };
-  }, [showOnboarding]);
+  }, [state.showOnboarding, actions]);
 
   // Toast auto-hide
   useEffect(() => {
-    if (!toast) return;
-    const timeout = setTimeout(() => setToast(null), 2000);
+    if (!state.toast) return;
+    const timeout = setTimeout(() => actions.setToast(null), TOAST_DURATION_MS);
     return () => clearTimeout(timeout);
-  }, [toast]);
-
-  const params: SpiralParams = {
-    type: spiralType,
-    tightness,
-    spinRate,
-    stepSize,
-    numSteps: performanceMode ? Math.min(numSteps, 500) : numSteps,
-    time,
-    viewportScale,
-    isPaused,
-    colorPreset,
-    zoom,
-    panX,
-    panY,
-    lineStyle,
-    backgroundStyle,
-    performanceMode,
-    lineThicknessVariation,
-  };
-
-  // Get background color for matching mode
-  const getBackgroundStyle = () => {
-    if (backgroundStyle === 'matching') {
-      const colorInfo = COLOR_PRESETS.find(c => c.id === colorPreset);
-      if (colorInfo) {
-        return `radial-gradient(circle at center, ${colorInfo.colors[0]}22 0%, #0a0a0f 100%)`;
-      }
-    }
-    return undefined;
-  };
-
-  const handleTypeChange = useCallback((type: SpiralType) => {
-    setSpiralType(type);
-    // Reset zoom/pan and apply default zoom for the new spiral type
-    setZoom(DEFAULT_ZOOM[type]);
-    setPanX(0);
-    setPanY(0);
-  }, []);
-
-  const handleSpinRateChange = useCallback((value: number) => {
-    setSpinRate(value);
-  }, []);
-
-  const handleTightnessChange = useCallback((value: number) => {
-    setTightness(value);
-  }, []);
-
-  const handleStepSizeChange = useCallback((value: number) => {
-    setStepSize(value);
-  }, []);
-
-  const handleNumStepsChange = useCallback((value: number) => {
-    setNumSteps(value);
-  }, []);
-
-  const handlePauseToggle = useCallback(() => {
-    setIsPaused(p => !p);
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setSpiralType(DEFAULTS.spiralType);
-    setSpinRate(DEFAULTS.spinRate);
-    setTightness(DEFAULTS.tightness);
-    setStepSize(DEFAULTS.stepSize);
-    setNumSteps(DEFAULTS.numSteps);
-    setColorPreset(DEFAULTS.colorPreset);
-    setLineStyle(DEFAULTS.lineStyle);
-    setBackgroundStyle(DEFAULTS.backgroundStyle);
-    setPerformanceMode(DEFAULTS.performanceMode);
-    setLineThicknessVariation(DEFAULTS.lineThicknessVariation);
-    setZoom(DEFAULT_ZOOM[DEFAULTS.spiralType]);
-    setPanX(0);
-    setPanY(0);
-    setTime(0);
-    setIsPaused(false);
-    // Clear URL params
-    window.history.replaceState({}, '', window.location.pathname);
-  }, []);
-
-  const handleColorChange = useCallback((preset: ColorPreset) => {
-    setColorPreset(preset);
-  }, []);
-
-  const handlePresetLoad = useCallback((preset: SpiralPreset) => {
-    if (preset.params.type) setSpiralType(preset.params.type);
-    if (preset.params.spinRate !== undefined) setSpinRate(preset.params.spinRate);
-    if (preset.params.tightness !== undefined) setTightness(preset.params.tightness);
-    if (preset.params.stepSize !== undefined) setStepSize(preset.params.stepSize);
-    if (preset.params.numSteps !== undefined) setNumSteps(preset.params.numSteps);
-    if (preset.params.colorPreset) setColorPreset(preset.params.colorPreset);
-    if (preset.params.lineStyle) setLineStyle(preset.params.lineStyle);
-    // Apply zoom from preset or use default for the spiral type
-    const defaultZoom = preset.params.type ? DEFAULT_ZOOM[preset.params.type] : 1;
-    setZoom(preset.params.zoom ?? defaultZoom);
-    setPanX(0);
-    setPanY(0);
-  }, []);
+  }, [state.toast, actions]);
 
   const handleShare = useCallback(async () => {
-    const state: ShareableState = {
-      spiralType,
-      spinRate,
-      tightness,
-      stepSize,
-      numSteps,
-      colorPreset,
-      lineStyle,
-      backgroundStyle,
-      performanceMode,
-      lineThicknessVariation,
-      zoom,
-      panX,
-      panY,
+    const shareState: ShareableState = {
+      spiralType: state.spiralType,
+      spinRate: state.spinRate,
+      tightness: state.tightness,
+      stepSize: state.stepSize,
+      numSteps: state.numSteps,
+      colorPreset: state.colorPreset,
+      lineStyle: state.lineStyle,
+      backgroundStyle: state.backgroundStyle,
+      performanceMode: state.performanceMode,
+      lineThicknessVariation: state.lineThicknessVariation,
+      zoom: state.zoom,
+      panX: state.panX,
+      panY: state.panY,
     };
-    const success = await copyShareURL(state);
+    const success = await copyShareURL(shareState);
     if (success) {
-      setToast('Link copied to clipboard!');
+      actions.setToast('Link copied to clipboard!');
     }
-  }, [spiralType, spinRate, tightness, stepSize, numSteps, colorPreset, lineStyle, backgroundStyle, performanceMode, lineThicknessVariation, zoom, panX, panY]);
+  }, [state, actions]);
 
   const handleExport = useCallback(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
 
     const link = document.createElement('a');
-    link.download = `uzumaki-${spiralType}-${Date.now()}.png`;
+    link.download = `uzumaki-${state.spiralType}-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
-  }, [spiralType]);
+  }, [state.spiralType]);
 
   const handleFullscreen = useCallback(() => {
     const elem = appRef.current;
@@ -298,35 +165,6 @@ function App() {
     }
   }, []);
 
-  const handleZoomChange = useCallback((newZoom: number) => {
-    setZoom(newZoom);
-  }, []);
-
-  const handlePanChange = useCallback((newPanX: number, newPanY: number) => {
-    setPanX(newPanX);
-    setPanY(newPanY);
-  }, []);
-
-  const handleLineStyleChange = useCallback((style: LineStyle) => {
-    setLineStyle(style);
-  }, []);
-
-  const handleBackgroundStyleChange = useCallback((style: BackgroundStyle) => {
-    setBackgroundStyle(style);
-  }, []);
-
-  const handlePerformanceModeChange = useCallback((enabled: boolean) => {
-    setPerformanceMode(enabled);
-  }, []);
-
-  const handleLineThicknessVariationChange = useCallback((enabled: boolean) => {
-    setLineThicknessVariation(enabled);
-  }, []);
-
-  const handleShowShortcuts = useCallback(() => {
-    setShowShortcuts(true);
-  }, []);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -336,10 +174,10 @@ function App() {
       switch (e.key.toLowerCase()) {
         case ' ':
           e.preventDefault();
-          setIsPaused(p => !p);
+          actions.togglePause();
           break;
         case 'r':
-          handleReset();
+          actions.reset();
           break;
         case 'f':
           handleFullscreen();
@@ -348,25 +186,23 @@ function App() {
           handleExport();
           break;
         case '?':
-          setShowShortcuts(s => !s);
+          actions.toggleShowShortcuts();
           break;
         case 'escape':
-          setShowShortcuts(false);
+          actions.setShowShortcuts(false);
           break;
         case 'arrowleft':
-          setSpinRate(r => Math.max(0, r - 0.1));
+          actions.adjustSpinRate(-SPIN_RATE_KEYBOARD_STEP);
           break;
         case 'arrowright':
-          setSpinRate(r => Math.min(2, r + 0.1));
+          actions.adjustSpinRate(SPIN_RATE_KEYBOARD_STEP);
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleExport, handleFullscreen, handleReset]);
-
-  const dynamicBg = getBackgroundStyle();
+  }, [handleExport, handleFullscreen, actions]);
 
   return (
     <div
@@ -374,7 +210,7 @@ function App() {
       ref={appRef}
       role="application"
       aria-label="Uzumaki Spiral Visualizer"
-      data-bg={backgroundStyle}
+      data-bg={state.backgroundStyle}
       style={dynamicBg ? { background: dynamicBg } : undefined}
     >
       {/* Header/Branding */}
@@ -393,51 +229,51 @@ function App() {
 
       {/* Zoom/Pan Indicator */}
       <div className="zoom-indicator">
-        <span>Zoom: <span className="zoom-value">{zoom.toFixed(1)}x</span></span>
-        {(panX !== 0 || panY !== 0) && (
-          <span>Pan: {Math.round(panX)}, {Math.round(panY)}</span>
+        <span>Zoom: <span className="zoom-value">{state.zoom.toFixed(1)}x</span></span>
+        {(state.panX !== 0 || state.panY !== 0) && (
+          <span>Pan: {Math.round(state.panX)}, {Math.round(state.panY)}</span>
         )}
       </div>
 
       <SpiralCanvas
         params={params}
-        onZoomChange={handleZoomChange}
-        onPanChange={handlePanChange}
+        onZoomChange={actions.setZoom}
+        onPanChange={actions.setPan}
       />
 
       <Controls
-        spiralType={spiralType}
-        spinRate={spinRate}
-        tightness={tightness}
-        stepSize={stepSize}
-        numSteps={numSteps}
-        isPaused={isPaused}
-        colorPreset={colorPreset}
-        lineStyle={lineStyle}
-        backgroundStyle={backgroundStyle}
-        performanceMode={performanceMode}
-        lineThicknessVariation={lineThicknessVariation}
-        onTypeChange={handleTypeChange}
-        onSpinRateChange={handleSpinRateChange}
-        onTightnessChange={handleTightnessChange}
-        onStepSizeChange={handleStepSizeChange}
-        onNumStepsChange={handleNumStepsChange}
-        onPauseToggle={handlePauseToggle}
-        onReset={handleReset}
-        onColorChange={handleColorChange}
-        onPresetLoad={handlePresetLoad}
+        spiralType={state.spiralType}
+        spinRate={state.spinRate}
+        tightness={state.tightness}
+        stepSize={state.stepSize}
+        numSteps={state.numSteps}
+        isPaused={state.isPaused}
+        colorPreset={state.colorPreset}
+        lineStyle={state.lineStyle}
+        backgroundStyle={state.backgroundStyle}
+        performanceMode={state.performanceMode}
+        lineThicknessVariation={state.lineThicknessVariation}
+        onTypeChange={actions.setSpiralType}
+        onSpinRateChange={actions.setSpinRate}
+        onTightnessChange={actions.setTightness}
+        onStepSizeChange={actions.setStepSize}
+        onNumStepsChange={actions.setNumSteps}
+        onPauseToggle={actions.togglePause}
+        onReset={actions.reset}
+        onColorChange={actions.setColorPreset}
+        onPresetLoad={actions.loadPreset}
         onExport={handleExport}
         onFullscreen={handleFullscreen}
         onShare={handleShare}
-        onLineStyleChange={handleLineStyleChange}
-        onBackgroundStyleChange={handleBackgroundStyleChange}
-        onPerformanceModeChange={handlePerformanceModeChange}
-        onLineThicknessVariationChange={handleLineThicknessVariationChange}
-        onShowShortcuts={handleShowShortcuts}
+        onLineStyleChange={actions.setLineStyle}
+        onBackgroundStyleChange={actions.setBackgroundStyle}
+        onPerformanceModeChange={actions.setPerformanceMode}
+        onLineThicknessVariationChange={actions.setLineThicknessVariation}
+        onShowShortcuts={() => actions.setShowShortcuts(true)}
       />
 
       {/* Onboarding hint for first-time users */}
-      {showOnboarding && (
+      {state.showOnboarding && (
         <div className={`onboarding-hint ${hasInteracted.current ? 'hiding' : ''}`}>
           <span className="hint-icon"><MouseIcon size={24} /></span>
           <span className="hint-text">Scroll to zoom - Drag to pan</span>
@@ -446,18 +282,18 @@ function App() {
       )}
 
       {/* Toast notifications */}
-      {toast && (
+      {state.toast && (
         <div className="toast" role="status" aria-live="polite" aria-atomic="true">
-          {toast}
+          {state.toast}
         </div>
       )}
 
       {/* Keyboard shortcuts modal */}
-      {showShortcuts && (
+      {state.showShortcuts && (
         <>
-          <div className="shortcuts-backdrop" onClick={() => setShowShortcuts(false)} />
+          <div className="shortcuts-backdrop" onClick={() => actions.setShowShortcuts(false)} />
           <div className="shortcuts-panel">
-            <h2 className="shortcuts-title">⌨️ Keyboard Shortcuts</h2>
+            <h2 className="shortcuts-title">Keyboard Shortcuts</h2>
             <div className="shortcut-row">
               <span className="shortcut-key">Space</span>
               <span className="shortcut-desc">Play / Pause</span>
@@ -475,7 +311,7 @@ function App() {
               <span className="shortcut-desc">Fullscreen</span>
             </div>
             <div className="shortcut-row">
-              <span className="shortcut-key">←/→</span>
+              <span className="shortcut-key">left/right</span>
               <span className="shortcut-desc">Adjust speed</span>
             </div>
             <div className="shortcut-row">
@@ -495,6 +331,15 @@ function App() {
         Keyboard shortcuts: Space to pause/play, R to reset, F for fullscreen, E to export
       </div>
     </div>
+  );
+}
+
+// Wrap with provider
+function App() {
+  return (
+    <SpiralProvider>
+      <AppContent />
+    </SpiralProvider>
   );
 }
 

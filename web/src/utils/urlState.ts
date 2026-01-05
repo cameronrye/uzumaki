@@ -8,6 +8,19 @@ import {
   LINE_STYLES,
   BACKGROUND_STYLES
 } from './spirals';
+import {
+  URL_SPIN_RATE_MAX,
+  URL_TIGHTNESS_MIN,
+  URL_TIGHTNESS_MAX,
+  URL_STEP_SIZE_MIN,
+  URL_STEP_SIZE_MAX,
+  URL_NUM_STEPS_MIN,
+  URL_NUM_STEPS_MAX,
+  ZOOM_MIN,
+  ZOOM_MAX,
+  PAN_LIMIT,
+  SPIN_RATE_MIN,
+} from './constants';
 
 export interface ShareableState {
   spiralType: SpiralType;
@@ -26,28 +39,40 @@ export interface ShareableState {
 }
 
 // Valid value sets for validation
-const VALID_SPIRAL_TYPES = new Set(SPIRAL_TYPES.map(t => t.type));
-const VALID_COLOR_PRESETS = new Set(COLOR_PRESETS.map(c => c.id));
-const VALID_LINE_STYLES = new Set(LINE_STYLES.map(l => l.id));
-const VALID_BACKGROUND_STYLES = new Set(BACKGROUND_STYLES.map(b => b.id));
+const VALID_SETS = {
+  spiralType: new Set(SPIRAL_TYPES.map(t => t.type)),
+  colorPreset: new Set(COLOR_PRESETS.map(c => c.id)),
+  lineStyle: new Set(LINE_STYLES.map(l => l.id)),
+  backgroundStyle: new Set(BACKGROUND_STYLES.map(b => b.id)),
+} as const;
 
-// Validation helpers
-function isValidSpiralType(value: string): value is SpiralType {
-  return VALID_SPIRAL_TYPES.has(value as SpiralType);
+// Parameter configuration for declarative parsing
+interface ParamConfig {
+  urlKey: string;
+  stateKey: keyof ShareableState;
+  type: 'enum' | 'number' | 'integer' | 'boolean';
+  validSet?: Set<string>;
+  min?: number;
+  max?: number;
 }
 
-function isValidColorPreset(value: string): value is ColorPreset {
-  return VALID_COLOR_PRESETS.has(value as ColorPreset);
-}
+const PARAM_CONFIGS: ParamConfig[] = [
+  { urlKey: 'type', stateKey: 'spiralType', type: 'enum', validSet: VALID_SETS.spiralType },
+  { urlKey: 'spin', stateKey: 'spinRate', type: 'number', min: SPIN_RATE_MIN, max: URL_SPIN_RATE_MAX },
+  { urlKey: 'tight', stateKey: 'tightness', type: 'number', min: URL_TIGHTNESS_MIN, max: URL_TIGHTNESS_MAX },
+  { urlKey: 'step', stateKey: 'stepSize', type: 'number', min: URL_STEP_SIZE_MIN, max: URL_STEP_SIZE_MAX },
+  { urlKey: 'pts', stateKey: 'numSteps', type: 'integer', min: URL_NUM_STEPS_MIN, max: URL_NUM_STEPS_MAX },
+  { urlKey: 'color', stateKey: 'colorPreset', type: 'enum', validSet: VALID_SETS.colorPreset },
+  { urlKey: 'line', stateKey: 'lineStyle', type: 'enum', validSet: VALID_SETS.lineStyle },
+  { urlKey: 'bg', stateKey: 'backgroundStyle', type: 'enum', validSet: VALID_SETS.backgroundStyle },
+  { urlKey: 'perf', stateKey: 'performanceMode', type: 'boolean' },
+  { urlKey: 'thick', stateKey: 'lineThicknessVariation', type: 'boolean' },
+  { urlKey: 'zoom', stateKey: 'zoom', type: 'number', min: ZOOM_MIN, max: ZOOM_MAX },
+  { urlKey: 'panX', stateKey: 'panX', type: 'number', min: -PAN_LIMIT, max: PAN_LIMIT },
+  { urlKey: 'panY', stateKey: 'panY', type: 'number', min: -PAN_LIMIT, max: PAN_LIMIT },
+];
 
-function isValidLineStyle(value: string): value is LineStyle {
-  return VALID_LINE_STYLES.has(value as LineStyle);
-}
-
-function isValidBackgroundStyle(value: string): value is BackgroundStyle {
-  return VALID_BACKGROUND_STYLES.has(value as BackgroundStyle);
-}
-
+// Generic validation helpers
 function isValidNumber(value: string, min?: number, max?: number): boolean {
   const num = parseFloat(value);
   if (isNaN(num)) return false;
@@ -64,88 +89,66 @@ function isValidInteger(value: string, min?: number, max?: number): boolean {
   return true;
 }
 
+function parseParamValue(
+  value: string | null,
+  config: ParamConfig
+): unknown {
+  // For booleans, missing value means false
+  if (config.type === 'boolean') {
+    return value === '1';
+  }
+
+  if (value === null) return undefined;
+
+  switch (config.type) {
+    case 'enum':
+      return config.validSet?.has(value) ? value : undefined;
+    case 'number':
+      return isValidNumber(value, config.min, config.max) ? parseFloat(value) : undefined;
+    case 'integer':
+      return isValidInteger(value, config.min, config.max) ? parseInt(value, 10) : undefined;
+    default:
+      return undefined;
+  }
+}
+
 // Encode state to URL params
 export function encodeStateToURL(state: ShareableState): string {
   const params = new URLSearchParams();
-  params.set('type', state.spiralType);
-  params.set('spin', state.spinRate.toString());
-  params.set('tight', state.tightness.toString());
-  params.set('step', state.stepSize.toString());
-  params.set('pts', state.numSteps.toString());
-  params.set('color', state.colorPreset);
-  params.set('line', state.lineStyle);
-  params.set('bg', state.backgroundStyle);
-  if (state.performanceMode) params.set('perf', '1');
-  if (state.lineThicknessVariation) params.set('thick', '1');
-  if (state.zoom !== 1) params.set('zoom', state.zoom.toString());
-  if (state.panX !== 0) params.set('panX', state.panX.toString());
-  if (state.panY !== 0) params.set('panY', state.panY.toString());
+
+  for (const config of PARAM_CONFIGS) {
+    const value = state[config.stateKey];
+
+    // Skip default/empty values for cleaner URLs
+    if (config.type === 'boolean') {
+      if (value) params.set(config.urlKey, '1');
+    } else if (config.stateKey === 'zoom' && value === 1) {
+      // Skip default zoom
+    } else if ((config.stateKey === 'panX' || config.stateKey === 'panY') && value === 0) {
+      // Skip zero pan
+    } else if (value !== undefined) {
+      params.set(config.urlKey, String(value));
+    }
+  }
+
   return params.toString();
 }
 
-// Decode URL params to state with validation
+// Decode URL params to state with validation (config-driven)
 export function decodeStateFromURL(): Partial<ShareableState> | null {
   const params = new URLSearchParams(window.location.search);
   if (params.size === 0) return null;
 
   const state: Partial<ShareableState> = {};
 
-  const type = params.get('type');
-  if (type && isValidSpiralType(type)) {
-    state.spiralType = type;
-  }
+  for (const config of PARAM_CONFIGS) {
+    const rawValue = params.get(config.urlKey);
+    const parsedValue = parseParamValue(rawValue, config);
 
-  const spin = params.get('spin');
-  if (spin && isValidNumber(spin, 0, 10)) {
-    state.spinRate = parseFloat(spin);
-  }
-
-  const tight = params.get('tight');
-  if (tight && isValidNumber(tight, 0.1, 50)) {
-    state.tightness = parseFloat(tight);
-  }
-
-  const step = params.get('step');
-  if (step && isValidNumber(step, 0.001, 1)) {
-    state.stepSize = parseFloat(step);
-  }
-
-  const pts = params.get('pts');
-  if (pts && isValidInteger(pts, 10, 10000)) {
-    state.numSteps = parseInt(pts, 10);
-  }
-
-  const color = params.get('color');
-  if (color && isValidColorPreset(color)) {
-    state.colorPreset = color;
-  }
-
-  const line = params.get('line');
-  if (line && isValidLineStyle(line)) {
-    state.lineStyle = line;
-  }
-
-  const bg = params.get('bg');
-  if (bg && isValidBackgroundStyle(bg)) {
-    state.backgroundStyle = bg;
-  }
-
-  state.performanceMode = params.get('perf') === '1';
-  state.lineThicknessVariation = params.get('thick') === '1';
-
-  const zoom = params.get('zoom');
-  if (zoom && isValidNumber(zoom, 0.1, 10)) {
-    state.zoom = parseFloat(zoom);
-  }
-
-  const panX = params.get('panX');
-  if (panX && isValidNumber(panX, -10000, 10000)) {
-    state.panX = parseFloat(panX);
-  }
-
-  const panY = params.get('panY');
-  if (panY && isValidNumber(panY, -10000, 10000)) {
-    state.panY = parseFloat(panY);
+    if (parsedValue !== undefined) {
+      // Type assertion needed due to dynamic key assignment
+      (state as Record<string, unknown>)[config.stateKey] = parsedValue;
+    }
   }
 
   return state;

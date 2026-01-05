@@ -233,40 +233,44 @@ function generateCurlicue(params: SpiralParams): SpiralPoint[] {
   return points;
 }
 
+// Spiral generator function type
+type SpiralGenerator = (params: SpiralParams) => SpiralPoint[];
+
+// Dispatch map for spiral generators - makes adding new spirals easy
+const SPIRAL_GENERATORS: Partial<Record<SpiralType, SpiralGenerator>> = {
+  uzumaki: generateUzumaki,
+  curlicue: generateCurlicue,
+  theodorus: generateTheodorus,
+  vogel: generateVogel,
+};
+
+// Apply zoom and pan transformations to points
+function applyTransformations(
+  points: SpiralPoint[],
+  zoom: number,
+  panX: number,
+  panY: number
+): SpiralPoint[] {
+  if (zoom === 1 && panX === 0 && panY === 0) {
+    return points;
+  }
+  return points.map(p => ({
+    x: p.x * zoom + panX,
+    y: p.y * zoom + panY,
+  }));
+}
+
 // Main function to generate spiral points
 export function generateSpiral(params: SpiralParams): SpiralPoint[] {
   const zoom = params.zoom ?? 1;
   const panX = params.panX ?? 0;
   const panY = params.panY ?? 0;
 
-  let points: SpiralPoint[];
+  // Use dispatch map, fallback to polar spiral for standard types
+  const generator = SPIRAL_GENERATORS[params.type] ?? generatePolarSpiral;
+  const points = generator(params);
 
-  switch (params.type) {
-    case 'uzumaki':
-      points = generateUzumaki(params);
-      break;
-    case 'curlicue':
-      points = generateCurlicue(params);
-      break;
-    case 'theodorus':
-      points = generateTheodorus(params);
-      break;
-    case 'vogel':
-      points = generateVogel(params);
-      break;
-    default:
-      points = generatePolarSpiral(params);
-  }
-
-  // Apply zoom and pan transformations
-  if (zoom !== 1 || panX !== 0 || panY !== 0) {
-    return points.map(p => ({
-      x: p.x * zoom + panX,
-      y: p.y * zoom + panY,
-    }));
-  }
-
-  return points;
+  return applyTransformations(points, zoom, panX, panY);
 }
 
 // Preset configurations for interesting spiral patterns
