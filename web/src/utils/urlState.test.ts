@@ -13,6 +13,9 @@ describe('encodeStateToURL', () => {
     backgroundStyle: 'dark',
     performanceMode: true,
     lineThicknessVariation: true,
+    zoom: 2.5,
+    panX: 100,
+    panY: -50,
   };
 
   it('should encode all state properties', () => {
@@ -27,6 +30,9 @@ describe('encodeStateToURL', () => {
     expect(encoded).toContain('bg=dark');
     expect(encoded).toContain('perf=1');
     expect(encoded).toContain('thick=1');
+    expect(encoded).toContain('zoom=2.5');
+    expect(encoded).toContain('panX=100');
+    expect(encoded).toContain('panY=-50');
   });
 
   it('should not include perf when performanceMode is false', () => {
@@ -39,6 +45,19 @@ describe('encodeStateToURL', () => {
     const state = { ...fullState, lineThicknessVariation: false };
     const encoded = encodeStateToURL(state);
     expect(encoded).not.toContain('thick=');
+  });
+
+  it('should not include zoom when zoom is 1', () => {
+    const state = { ...fullState, zoom: 1 };
+    const encoded = encodeStateToURL(state);
+    expect(encoded).not.toContain('zoom=');
+  });
+
+  it('should not include panX/panY when they are 0', () => {
+    const state = { ...fullState, panX: 0, panY: 0 };
+    const encoded = encodeStateToURL(state);
+    expect(encoded).not.toContain('panX=');
+    expect(encoded).not.toContain('panY=');
   });
 });
 

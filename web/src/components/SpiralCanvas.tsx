@@ -104,69 +104,132 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     }
 
     const isGlowOnly = lineStyle === 'glow';
+    const isPointsMode = lineStyle === 'points';
+    const isTrianglesMode = lineStyle === 'triangles';
     const isPerformanceMode = params.performanceMode;
     const hasThicknessVariation = params.lineThicknessVariation;
 
-    // Draw glow effect (skip in performance mode for glow-only, otherwise always draw)
-    if (!isPerformanceMode || isGlowOnly) {
-      const glowColor = colors[2] || colors[0];
-      const glowLayers = isPerformanceMode
-        ? [{ width: 8, opacity: 0.2 }]
-        : [
-            { width: 12, opacity: 0.1 },
-            { width: 8, opacity: 0.15 },
-            { width: 5, opacity: 0.2 },
-          ];
+    // Triangles mode: draw triangles from center (ideal for Theodorus spiral)
+    if (isTrianglesMode) {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-      for (const layer of glowLayers) {
+      // First point is the center for Theodorus spiral
+      const originX = centerX + points[0].x;
+      const originY = centerY + points[0].y;
+
+      for (let i = 1; i < points.length; i++) {
+        const progress = i / points.length;
+        const colorIndex = Math.floor(progress * (colors.length - 1));
+        ctx.strokeStyle = colors[colorIndex];
+
+        // Draw triangle: center -> previous point -> current point -> center
         ctx.beginPath();
-        ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
-        for (let i = 1; i < points.length; i++) {
-          ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+        ctx.moveTo(originX, originY);
+        if (i > 1) {
+          ctx.lineTo(centerX + points[i - 1].x, centerY + points[i - 1].y);
         }
-        ctx.strokeStyle = glowColor;
-        ctx.globalAlpha = isGlowOnly ? layer.opacity * 2 : layer.opacity;
-        ctx.lineWidth = isGlowOnly ? layer.width * 1.5 : layer.width;
+        ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+        ctx.lineTo(originX, originY);
         ctx.stroke();
       }
-    }
 
-    // Draw main spiral (skip for glow-only mode)
-    if (!isGlowOnly) {
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = gradient;
-
-      if (hasThicknessVariation) {
-        // Fix #9: Optimize variable thickness - batch similar widths
-        // Group segments into buckets to reduce draw calls
-        const bucketCount = 10;
-        const segmentsPerBucket = Math.ceil(points.length / bucketCount);
-
-        for (let bucket = 0; bucket < bucketCount; bucket++) {
-          const startIdx = bucket * segmentsPerBucket;
-          const endIdx = Math.min((bucket + 1) * segmentsPerBucket, points.length);
-          const midProgress = (startIdx + endIdx) / 2 / points.length;
-
-          ctx.beginPath();
-          ctx.lineWidth = 1 + midProgress * 3;
-
-          if (startIdx < points.length) {
-            ctx.moveTo(centerX + points[startIdx].x, centerY + points[startIdx].y);
-            for (let i = startIdx + 1; i < endIdx; i++) {
-              ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
-            }
-            ctx.stroke();
-          }
-        }
-      } else {
-        // Draw with uniform thickness
-        ctx.beginPath();
-        ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
-        for (let i = 1; i < points.length; i++) {
+      // Draw hypotenuse markers (the outer edge)
+      ctx.strokeStyle = colors[0];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (points.length > 1) {
+        ctx.moveTo(centerX + points[1].x, centerY + points[1].y);
+        for (let i = 2; i < points.length; i++) {
           ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
         }
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      }
+      ctx.stroke();
+    } else if (isPointsMode) {
+      // Points mode: draw discrete circles (ideal for Vogel/phyllotaxis patterns)
+      ctx.globalAlpha = 1;
+      const pointRadius = Math.max(1.5, 3 * (params.zoom ?? 1));
+
+      for (let i = 0; i < points.length; i++) {
+        const progress = i / points.length;
+        const colorIndex = Math.floor(progress * (colors.length - 1));
+        const nextColorIndex = Math.min(colorIndex + 1, colors.length - 1);
+        const colorProgress = (progress * (colors.length - 1)) % 1;
+
+        // Interpolate between colors for smooth gradient
+        ctx.fillStyle = colors[colorIndex];
+        if (colorProgress > 0 && colorIndex !== nextColorIndex) {
+          ctx.fillStyle = colors[nextColorIndex];
+        }
+
+        ctx.beginPath();
+        ctx.arc(centerX + points[i].x, centerY + points[i].y, pointRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // Draw glow effect (skip in performance mode for glow-only, otherwise always draw)
+      if (!isPerformanceMode || isGlowOnly) {
+        const glowColor = colors[2] || colors[0];
+        const glowLayers = isPerformanceMode
+          ? [{ width: 8, opacity: 0.2 }]
+          : [
+              { width: 12, opacity: 0.1 },
+              { width: 8, opacity: 0.15 },
+              { width: 5, opacity: 0.2 },
+            ];
+
+        for (const layer of glowLayers) {
+          ctx.beginPath();
+          ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+          }
+          ctx.strokeStyle = glowColor;
+          ctx.globalAlpha = isGlowOnly ? layer.opacity * 2 : layer.opacity;
+          ctx.lineWidth = isGlowOnly ? layer.width * 1.5 : layer.width;
+          ctx.stroke();
+        }
+      }
+
+      // Draw main spiral (skip for glow-only mode)
+      if (!isGlowOnly) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = gradient;
+
+        if (hasThicknessVariation) {
+          // Fix #9: Optimize variable thickness - batch similar widths
+          // Group segments into buckets to reduce draw calls
+          const bucketCount = 10;
+          const segmentsPerBucket = Math.ceil(points.length / bucketCount);
+
+          for (let bucket = 0; bucket < bucketCount; bucket++) {
+            const startIdx = bucket * segmentsPerBucket;
+            const endIdx = Math.min((bucket + 1) * segmentsPerBucket, points.length);
+            const midProgress = (startIdx + endIdx) / 2 / points.length;
+
+            ctx.beginPath();
+            ctx.lineWidth = 1 + midProgress * 3;
+
+            if (startIdx < points.length) {
+              ctx.moveTo(centerX + points[startIdx].x, centerY + points[startIdx].y);
+              for (let i = startIdx + 1; i < endIdx; i++) {
+                ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+              }
+              ctx.stroke();
+            }
+          }
+        } else {
+          // Draw with uniform thickness
+          ctx.beginPath();
+          ctx.moveTo(centerX + points[0].x, centerY + points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(centerX + points[i].x, centerY + points[i].y);
+          }
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
       }
     }
 

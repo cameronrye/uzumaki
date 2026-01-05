@@ -20,6 +20,9 @@ export interface ShareableState {
   backgroundStyle: BackgroundStyle;
   performanceMode: boolean;
   lineThicknessVariation: boolean;
+  zoom: number;
+  panX: number;
+  panY: number;
 }
 
 // Valid value sets for validation
@@ -74,6 +77,9 @@ export function encodeStateToURL(state: ShareableState): string {
   params.set('bg', state.backgroundStyle);
   if (state.performanceMode) params.set('perf', '1');
   if (state.lineThicknessVariation) params.set('thick', '1');
+  if (state.zoom !== 1) params.set('zoom', state.zoom.toString());
+  if (state.panX !== 0) params.set('panX', state.panX.toString());
+  if (state.panY !== 0) params.set('panY', state.panY.toString());
   return params.toString();
 }
 
@@ -126,6 +132,21 @@ export function decodeStateFromURL(): Partial<ShareableState> | null {
 
   state.performanceMode = params.get('perf') === '1';
   state.lineThicknessVariation = params.get('thick') === '1';
+
+  const zoom = params.get('zoom');
+  if (zoom && isValidNumber(zoom, 0.1, 10)) {
+    state.zoom = parseFloat(zoom);
+  }
+
+  const panX = params.get('panX');
+  if (panX && isValidNumber(panX, -10000, 10000)) {
+    state.panX = parseFloat(panX);
+  }
+
+  const panY = params.get('panY');
+  if (panY && isValidNumber(panY, -10000, 10000)) {
+    state.panY = parseFloat(panY);
+  }
 
   return state;
 }

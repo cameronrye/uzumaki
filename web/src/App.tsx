@@ -9,7 +9,8 @@ import {
   SpiralPreset,
   LineStyle,
   BackgroundStyle,
-  COLOR_PRESETS
+  COLOR_PRESETS,
+  DEFAULT_ZOOM
 } from './utils/spirals';
 import { decodeStateFromURL, copyShareURL, ShareableState } from './utils/urlState';
 
@@ -30,8 +31,9 @@ const DEFAULTS = {
 function App() {
   // Load initial state from URL or defaults
   const urlState = useRef(decodeStateFromURL());
+  const initialSpiralType = urlState.current?.spiralType ?? DEFAULTS.spiralType;
 
-  const [spiralType, setSpiralType] = useState<SpiralType>(urlState.current?.spiralType ?? DEFAULTS.spiralType);
+  const [spiralType, setSpiralType] = useState<SpiralType>(initialSpiralType);
   const [spinRate, setSpinRate] = useState(urlState.current?.spinRate ?? DEFAULTS.spinRate);
   const [tightness, setTightness] = useState(urlState.current?.tightness ?? DEFAULTS.tightness);
   const [stepSize, setStepSize] = useState(urlState.current?.stepSize ?? DEFAULTS.stepSize);
@@ -44,9 +46,9 @@ function App() {
   const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(urlState.current?.backgroundStyle ?? DEFAULTS.backgroundStyle);
   const [performanceMode, setPerformanceMode] = useState(urlState.current?.performanceMode ?? DEFAULTS.performanceMode);
   const [lineThicknessVariation, setLineThicknessVariation] = useState(urlState.current?.lineThicknessVariation ?? DEFAULTS.lineThicknessVariation);
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
+  const [zoom, setZoom] = useState(urlState.current?.zoom ?? DEFAULT_ZOOM[initialSpiralType]);
+  const [panX, setPanX] = useState(urlState.current?.panX ?? 0);
+  const [panY, setPanY] = useState(urlState.current?.panY ?? 0);
 
   // UI state
   const [showOnboarding, setShowOnboarding] = useState(!urlState.current);
@@ -180,6 +182,10 @@ function App() {
 
   const handleTypeChange = useCallback((type: SpiralType) => {
     setSpiralType(type);
+    // Reset zoom/pan and apply default zoom for the new spiral type
+    setZoom(DEFAULT_ZOOM[type]);
+    setPanX(0);
+    setPanY(0);
   }, []);
 
   const handleSpinRateChange = useCallback((value: number) => {
@@ -213,7 +219,7 @@ function App() {
     setBackgroundStyle(DEFAULTS.backgroundStyle);
     setPerformanceMode(DEFAULTS.performanceMode);
     setLineThicknessVariation(DEFAULTS.lineThicknessVariation);
-    setZoom(1);
+    setZoom(DEFAULT_ZOOM[DEFAULTS.spiralType]);
     setPanX(0);
     setPanY(0);
     setTime(0);
@@ -232,6 +238,13 @@ function App() {
     if (preset.params.tightness !== undefined) setTightness(preset.params.tightness);
     if (preset.params.stepSize !== undefined) setStepSize(preset.params.stepSize);
     if (preset.params.numSteps !== undefined) setNumSteps(preset.params.numSteps);
+    if (preset.params.colorPreset) setColorPreset(preset.params.colorPreset);
+    if (preset.params.lineStyle) setLineStyle(preset.params.lineStyle);
+    // Apply zoom from preset or use default for the spiral type
+    const defaultZoom = preset.params.type ? DEFAULT_ZOOM[preset.params.type] : 1;
+    setZoom(preset.params.zoom ?? defaultZoom);
+    setPanX(0);
+    setPanY(0);
   }, []);
 
   const handleShare = useCallback(async () => {
@@ -246,12 +259,15 @@ function App() {
       backgroundStyle,
       performanceMode,
       lineThicknessVariation,
+      zoom,
+      panX,
+      panY,
     };
     const success = await copyShareURL(state);
     if (success) {
       setToast('Link copied to clipboard!');
     }
-  }, [spiralType, spinRate, tightness, stepSize, numSteps, colorPreset, lineStyle, backgroundStyle, performanceMode, lineThicknessVariation]);
+  }, [spiralType, spinRate, tightness, stepSize, numSteps, colorPreset, lineStyle, backgroundStyle, performanceMode, lineThicknessVariation, zoom, panX, panY]);
 
   const handleExport = useCallback(() => {
     const canvas = document.querySelector('canvas');
