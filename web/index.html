@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Uzumaki - Interactive Spiral Visualizer</title>
+
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="Uzumaki - Interactive Spiral Visualizer" />
+    <meta name="description" content="Create mesmerizing spiral patterns with Uzumaki. An interactive web app featuring Archimedean, Fermat, logarithmic, and golden spirals with customizable colors, animations, and export options." />
+    <meta name="keywords" content="spiral visualizer, spiral generator, mathematical spirals, Archimedean spiral, Fermat spiral, golden spiral, interactive art, generative art, web app" />
+    <meta name="author" content="Uzumaki" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+
+    <!-- Theme and PWA -->
+    <meta name="theme-color" content="#48dbfb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Uzumaki" />
+    <meta name="application-name" content="Uzumaki" />
+    <meta name="msapplication-TileColor" content="#0a0a0f" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://uzumaki.app/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://uzumaki.app/" />
+    <meta property="og:title" content="Uzumaki - Interactive Spiral Visualizer" />
+    <meta property="og:description" content="Create mesmerizing spiral patterns with Uzumaki. An interactive web app featuring mathematical spirals with customizable colors and animations." />
+    <meta property="og:image" content="https://uzumaki.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Uzumaki Spiral Visualizer - Create beautiful mathematical spiral patterns" />
+    <meta property="og:site_name" content="Uzumaki" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://uzumaki.app/" />
+    <meta name="twitter:title" content="Uzumaki - Interactive Spiral Visualizer" />
+    <meta name="twitter:description" content="Create mesmerizing spiral patterns with Uzumaki. An interactive web app featuring mathematical spirals with customizable colors and animations." />
+    <meta name="twitter:image" content="https://uzumaki.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Uzumaki Spiral Visualizer - Create beautiful mathematical spiral patterns" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#48dbfb" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Preconnect to important origins -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+
+    <!-- Structured Data - WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Uzumaki",
+      "alternateName": "Uzumaki Spiral Visualizer",
+      "description": "Create mesmerizing spiral patterns with Uzumaki. An interactive web app featuring Archimedean, Fermat, logarithmic, and golden spirals with customizable colors, animations, and export options.",
+      "url": "https://uzumaki.app/",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Any",
+      "browserRequirements": "Requires JavaScript. Requires HTML5 Canvas.",
+      "softwareVersion": "1.0.0",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Archimedean spiral generation",
+        "Fermat spiral generation",
+        "Logarithmic spiral generation",
+        "Golden spiral generation",
+        "Custom color presets",
+        "Real-time animation",
+        "Pan and zoom controls",
+        "Share via URL",
+        "Keyboard shortcuts",
+        "Fullscreen mode"
+      ],
+      "screenshot": "https://uzumaki.app/og-image.png",
+      "image": "https://uzumaki.app/og-image.png",
+      "author": {
+        "@type": "Organization",
+        "name": "Uzumaki"
+      }
+    }
+    </script>
+
+    <!-- Structured Data - SoftwareApplication for App Stores -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Uzumaki",
+      "operatingSystem": "Web",
+      "applicationCategory": "GraphicsApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
