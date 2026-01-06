@@ -229,7 +229,7 @@ swift test
 
 - Native SwiftUI Canvas rendering
 - SIMD-optimized spiral generation
-- All 8 spiral types from the web app
+- All 10 spiral types from the web app
 - All 10 color presets
 - Play/pause animation with TimelineView
 - Pinch-to-zoom and pan gestures
@@ -245,9 +245,9 @@ swift test
 | R                | Reset to defaults    |
 | E                | Export as PNG        |
 | F                | Toggle fullscreen    |
-| Arrow Up/Down    | Adjust speed         |
-| Arrow Left/Right | Adjust tightness     |
-| 1-7              | Switch spiral type   |
+| Arrow Left/Right | Adjust speed         |
+| ?                | Toggle shortcuts     |
+| Esc              | Close shortcuts      |
 
 ## Tech Stack
 
