@@ -66,14 +66,14 @@ clean_derived_data() {
     rm -rf ~/Library/Developer/Xcode/DerivedData/Uzumaki-* 2>/dev/null || true
 }
 
-# Archive function
+# Archive function - returns archive path via global variable to avoid tee output capture issues
 archive_app() {
     local platform=$1
     local destination=$2
-    local archive_path="$ARCHIVE_DIR/Uzumaki-${platform}-${VERSION}-${BUILD_NUMBER}.xcarchive"
+    LAST_ARCHIVE_PATH="$ARCHIVE_DIR/Uzumaki-${platform}-${VERSION}-${BUILD_NUMBER}.xcarchive"
 
     # Remove old archive if exists
-    rm -rf "$archive_path" 2>/dev/null || true
+    rm -rf "$LAST_ARCHIVE_PATH" 2>/dev/null || true
 
     log_info "Archiving for $platform..."
 
@@ -83,19 +83,19 @@ archive_app() {
         -scheme "$SCHEME" \
         -configuration Release \
         -destination "$destination" \
-        -archivePath "$archive_path" \
+        -archivePath "$LAST_ARCHIVE_PATH" \
         -allowProvisioningUpdates \
         CODE_SIGN_STYLE=Automatic \
         2>&1 | tee "$BUILD_DIR/archive-${platform}.log"
-    local result=$?
+    local result=${PIPESTATUS[0]}
     set -e
 
-    if [[ $result -eq 0 ]] && [[ -d "$archive_path" ]]; then
-        log_success "Archive created: $archive_path"
-        echo "$archive_path"
+    if [[ $result -eq 0 ]] && [[ -d "$LAST_ARCHIVE_PATH" ]]; then
+        log_success "Archive created: $LAST_ARCHIVE_PATH"
+        return 0
     else
         log_error "Archive failed for $platform. Check $BUILD_DIR/archive-${platform}.log"
-        exit 1
+        return 1
     fi
 }
 
@@ -158,25 +158,31 @@ main() {
 
     if [[ "$PLATFORM" == "ios" || "$PLATFORM" == "all" ]]; then
         log_info "=== iOS Build ==="
-        IOS_ARCHIVE=$(archive_app "ios" "generic/platform=iOS")
-
-        if [[ "$ARCHIVE_ONLY" == false ]]; then
-            upload_to_testflight "$IOS_ARCHIVE" "ios" || ios_success=false
+        if archive_app "ios" "generic/platform=iOS"; then
+            IOS_ARCHIVE="$LAST_ARCHIVE_PATH"
+            if [[ "$ARCHIVE_ONLY" == false ]]; then
+                upload_to_testflight "$IOS_ARCHIVE" "ios" || ios_success=false
+            else
+                log_info "Archive only mode - skipping upload"
+                log_info "iOS Archive: $IOS_ARCHIVE"
+            fi
         else
-            log_info "Archive only mode - skipping upload"
-            log_info "iOS Archive: $IOS_ARCHIVE"
+            ios_success=false
         fi
     fi
 
     if [[ "$PLATFORM" == "macos" || "$PLATFORM" == "all" ]]; then
         log_info "=== macOS Build ==="
-        MACOS_ARCHIVE=$(archive_app "macos" "generic/platform=macOS")
-
-        if [[ "$ARCHIVE_ONLY" == false ]]; then
-            upload_to_testflight "$MACOS_ARCHIVE" "macos" || macos_success=false
+        if archive_app "macos" "generic/platform=macOS"; then
+            MACOS_ARCHIVE="$LAST_ARCHIVE_PATH"
+            if [[ "$ARCHIVE_ONLY" == false ]]; then
+                upload_to_testflight "$MACOS_ARCHIVE" "macos" || macos_success=false
+            else
+                log_info "Archive only mode - skipping upload"
+                log_info "macOS Archive: $MACOS_ARCHIVE"
+            fi
         else
-            log_info "Archive only mode - skipping upload"
-            log_info "macOS Archive: $MACOS_ARCHIVE"
+            macos_success=false
         fi
     fi
 
