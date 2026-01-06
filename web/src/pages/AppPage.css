@@ -1,0 +1,210 @@
+.app-hero {
+  text-align: center;
+  padding: var(--space-3xl) 0;
+}
+
+.hero-icon {
+  width: 80px;
+  height: 80px;
+  animation: spinSlow 20s linear infinite;
+  margin-bottom: var(--space-xl);
+}
+
+.hero-title {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--space-lg);
+}
+
+.hero-subtitle {
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-secondary);
+  max-width: 500px;
+  margin: 0 auto var(--space-2xl);
+  line-height: 1.6;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-2xl);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--transition-base);
+}
+
+.cta-button.primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: var(--color-bg-primary);
+}
+
+.cta-button.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(72, 219, 251, 0.4);
+}
+
+.cta-button.app-store {
+  background: #000;
+  color: #fff;
+  border: 1px solid var(--color-border);
+}
+
+.cta-button.app-store:hover {
+  background: #1a1a1a;
+  border-color: var(--color-text-muted);
+}
+
+.cta-button.large {
+  padding: var(--space-xl) var(--space-3xl);
+  font-size: var(--font-size-3xl);
+}
+
+.apple-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.spiral-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.spiral-type {
+  padding: var(--space-lg);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  text-align: center;
+  font-size: var(--font-size-xl);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-base);
+}
+
+.spiral-type:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
+}
+
+.feature {
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.feature-icon {
+  font-size: 32px;
+  margin-bottom: var(--space-md);
+}
+
+.feature h3 {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.feature p {
+  font-size: var(--font-size-xl);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
+}
+
+.platform {
+  text-align: center;
+  padding: var(--space-xl);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
+.platform-icon {
+  font-size: 40px;
+  margin-bottom: var(--space-md);
+}
+
+.platform h3 {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.platform p {
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-md);
+}
+
+.platform-link {
+  font-size: var(--font-size-md);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.platform-link:hover {
+  text-decoration: underline;
+}
+
+.cta-section {
+  text-align: center;
+  padding: var(--space-3xl);
+  background: linear-gradient(135deg, rgba(72, 219, 251, 0.1), rgba(255, 107, 107, 0.1));
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border);
+}
+
+.cta-section h2 {
+  margin-bottom: var(--space-md);
+}
+
+.cta-section p {
+  margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 36px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .cta-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

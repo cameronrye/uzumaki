@@ -1,7 +1,8 @@
 import { useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { SpiralCanvas } from './components/SpiralCanvas';
 import { Controls } from './components/Controls';
-import { SpiralIcon, MouseIcon } from './components/Icons';
+import { SpiralIcon, MouseIcon, HelpCircleIcon } from './components/Icons';
 import { SpiralProvider, useSpiralContext, useBackgroundStyle } from './context/SpiralContext';
 import { copyShareURL, ShareableState } from './utils/urlState';
 import {
