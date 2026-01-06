@@ -13,6 +13,7 @@ struct UzumakiWatchApp: App {
     var body: some Scene {
         WindowGroup {
             WatchContentView()
+                .preferredColorScheme(.dark)
         }
     }
 }

@@ -7,6 +7,7 @@ struct UzumakiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark)
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 700)
                 #endif

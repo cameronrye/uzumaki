@@ -65,6 +65,15 @@ public struct ContentView: View {
         #endif
     }
 
+    /// Whether to use macOS sidebar layout
+    private var useMacLayout: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return false
+        #endif
+    }
+
     public init() {}
 
     public var body: some View {
@@ -73,12 +82,20 @@ public struct ContentView: View {
             viewModel.backgroundColor
                 .ignoresSafeArea()
 
-            // Use iPad side panel layout or standard overlay layout
+            // Use platform-specific layout
+            #if os(macOS)
+            if useMacLayout {
+                macOSLayout
+            } else {
+                standardLayout
+            }
+            #else
             if useIPadLayout {
                 iPadLayout
             } else {
                 standardLayout
             }
+            #endif
 
             // Toast (at top)
             if let message = viewModel.toastMessage {
@@ -213,6 +230,116 @@ public struct ContentView: View {
             }
         }
     }
+
+    // MARK: - macOS Layout
+
+    /// macOS layout with sidebar for controls (similar to iPad but optimized for desktop)
+    #if os(macOS)
+    private var macOSLayout: some View {
+        ZStack(alignment: .topTrailing) {
+            HStack(spacing: 0) {
+                // Main canvas area
+                ZStack {
+                    spiralCanvas
+
+                    // Gesture hint (first launch)
+                    if showOnboardingHint {
+                        VStack {
+                            Spacer()
+                            gestureHint
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                .padding(.bottom, 20)
+                        }
+                    }
+                }
+
+                // Side panel with controls (animated)
+                if isSidebarVisible {
+                    macOSSidePanel
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+
+            // Sidebar toggle button (only shown when sidebar is hidden)
+            if !isSidebarVisible {
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isSidebarVisible.toggle()
+                    }
+                }) {
+                    Image(systemName: "sidebar.trailing")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+                .padding(.trailing, 12)
+                .help("Show Controls (Command+\\)")
+                .transition(.opacity)
+            }
+        }
+    }
+
+    /// macOS side panel with controls
+    private var macOSSidePanel: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Header with toggle button
+                HStack {
+                    Text("Controls")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button(action: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isSidebarVisible = false
+                        }
+                    }) {
+                        Image(systemName: "sidebar.trailing")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Hide Controls (Command+\\)")
+                }
+                .padding(.bottom, 8)
+
+                // Action buttons row
+                macOSActionButtons
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Spiral type picker
+                macOSSpiralTypePicker
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Parameter sliders
+                macOSParameterSliders
+
+                // Appearance options
+                macOSAppearanceSection
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Quick presets
+                macOSPresetsSection
+
+                Spacer(minLength: 20)
+
+                // Footer attribution
+                macOSFooter
+            }
+            .padding(20)
+        }
+        .frame(width: 300)
+        .background(Color.black.opacity(0.2))
+        .adaptiveGlassRoundedRect(cornerRadius: 0)
+        .ignoresSafeArea()
+    }
+    #endif
 
     /// iPad side panel with controls
     private var iPadSidePanel: some View {
@@ -522,6 +649,281 @@ public struct ContentView: View {
         }
     }
 
+    // MARK: - macOS Side Panel Components
+
+    #if os(macOS)
+    private var macOSActionButtons: some View {
+        HStack(spacing: 8) {
+            // Play/Pause
+            Button(action: viewModel.togglePause) {
+                Image(systemName: viewModel.isPaused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 32, height: 32)
+                    .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .help(viewModel.isPaused ? "Play (Space)" : "Pause (Space)")
+
+            // Reset
+            Button(action: resetView) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 32, height: 32)
+                    .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .help("Reset (R)")
+
+            Spacer()
+
+            // Export
+            Button(action: exportSpiral) {
+                Image(systemName: "square.and.arrow.down")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 32, height: 32)
+                    .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .help("Export (E)")
+
+            // Share
+            Button(action: shareSpiral) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 32, height: 32)
+                    .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .help("Share")
+        }
+    }
+
+    private var macOSSpiralTypePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Spiral Type")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                ForEach(SpiralType.allCases) { type in
+                    Button(action: { viewModel.spiralType = type }) {
+                        Text(type.displayName)
+                            .font(.caption.weight(.medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .adaptiveGlassRoundedRect(cornerRadius: 6, interactive: true)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(viewModel.spiralType == type ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(viewModel.spiralType == type ? 1.0 : 0.7))
+                }
+            }
+        }
+    }
+
+    private var macOSParameterSliders: some View {
+        VStack(spacing: 10) {
+            macOSSlider(label: "Speed", value: $viewModel.spinRate, range: Constants.spinRateMin...Constants.spinRateMax, format: "%.2f")
+            macOSSlider(label: "Density", value: $viewModel.tightness, range: Constants.tightnessMin...Constants.tightnessMax, format: "%.1f")
+            macOSSlider(label: "Smoothness", value: $viewModel.stepSize, range: Constants.stepSizeMin...Constants.stepSizeMax, format: "%.2f")
+
+            // Complexity slider (Int)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Complexity")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(viewModel.numSteps)")
+                        .font(.caption.weight(.semibold).monospaced())
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(viewModel.numSteps) },
+                        set: { newValue in
+                            // Round to nearest step
+                            let step = Double(Constants.numStepsStep)
+                            let rounded = (newValue / step).rounded() * step
+                            viewModel.numSteps = Int(rounded)
+                        }
+                    ),
+                    in: Double(Constants.numStepsMin)...Double(Constants.numStepsMax)
+                )
+                .tint(.white.opacity(0.6))
+            }
+
+            Divider().background(Color.white.opacity(0.1))
+
+            // Stats row
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption2)
+                    Text("\(viewModel.zoom, specifier: "%.1f")x")
+                        .font(.caption2.weight(.medium).monospaced())
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "speedometer")
+                        .font(.caption2)
+                    Text("\(viewModel.fps) fps")
+                        .font(.caption2.weight(.medium).monospaced())
+                        .contentTransition(.numericText())
+                }
+            }
+            .foregroundStyle(.white.opacity(0.5))
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            Divider().background(Color.white.opacity(0.1))
+        }
+    }
+
+    private func macOSSlider(label: String, value: Binding<Double>, range: ClosedRange<Double>, format: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                Spacer()
+                Text(String(format: format, value.wrappedValue))
+                    .font(.caption.weight(.semibold).monospaced())
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            Slider(value: value, in: range)
+                .tint(.white.opacity(0.6))
+        }
+    }
+
+    private var macOSAppearanceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Appearance")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            // Color preset
+            macOSPickerRow(title: "Colors", selection: $viewModel.colorPreset) { preset in
+                HStack(spacing: 2) {
+                    ForEach(0..<min(3, preset.colors.count), id: \.self) { index in
+                        Circle().fill(preset.colors[index]).frame(width: 6, height: 6)
+                    }
+                }
+            }
+
+            // Line style
+            macOSPickerRow(title: "Line Style", selection: $viewModel.lineStyle) { _ in EmptyView() }
+
+            // Background
+            macOSPickerRow(title: "Background", selection: $viewModel.backgroundTheme) { _ in EmptyView() }
+
+            // Toggles
+            Toggle("Variable Thickness", isOn: $viewModel.lineThicknessVariation)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.7))
+                .toggleStyle(.switch)
+                .tint(.white.opacity(0.6))
+
+            Toggle("Performance Mode", isOn: $viewModel.performanceMode)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.7))
+                .toggleStyle(.switch)
+                .tint(.white.opacity(0.6))
+        }
+    }
+
+    private func macOSPickerRow<T: CaseIterable & Identifiable & RawRepresentable, Content: View>(
+        title: String,
+        selection: Binding<T>,
+        @ViewBuilder preview: @escaping (T) -> Content
+    ) -> some View where T.RawValue == String, T.AllCases: RandomAccessCollection {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.7))
+            Spacer()
+            Menu {
+                ForEach(Array(T.allCases), id: \.id) { item in
+                    Button(action: { selection.wrappedValue = item }) {
+                        Text(item.rawValue.capitalized)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    preview(selection.wrappedValue)
+                    Text(selection.wrappedValue.rawValue.capitalized)
+                        .font(.caption.weight(.medium))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .adaptiveGlassRoundedRect(cornerRadius: 6, interactive: true)
+            }
+        }
+    }
+
+    private var macOSPresetsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Presets")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                ForEach(SpiralPreset.allPresets) { preset in
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            viewModel.loadPreset(preset)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            ForEach(0..<min(3, preset.colorPreset.colors.count), id: \.self) { index in
+                                Circle().fill(preset.colorPreset.colors[index]).frame(width: 4, height: 4)
+                            }
+                            Text(preset.name)
+                                .font(.caption2.weight(.medium))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 4)
+                        .adaptiveGlassRoundedRect(cornerRadius: 6, interactive: true)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.9))
+                }
+            }
+        }
+    }
+
+    private var macOSFooter: some View {
+        HStack(spacing: 4) {
+            Text("Made with")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.4))
+
+            Image(systemName: "heart.fill")
+                .font(.caption2)
+                .foregroundStyle(BrandColors.gradient)
+
+            Text("by")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.4))
+
+            Link("Cameron Rye", destination: URL(string: "https://rye.dev")!)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.5))
+        }
+    }
+    #endif
+
     // MARK: - Shared Components
 
     /// The spiral canvas with gestures
@@ -591,6 +993,15 @@ public struct ContentView: View {
                 exportSpiral()
             }
             .keyboardShortcut("e", modifiers: [])
+
+            #if os(macOS)
+            Button("") {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isSidebarVisible.toggle()
+                }
+            }
+            .keyboardShortcut("\\", modifiers: .command)
+            #endif
         }
         .buttonStyle(.plain)
         .frame(width: 0, height: 0)
