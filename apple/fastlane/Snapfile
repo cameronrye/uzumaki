@@ -1,0 +1,62 @@
+# Snapfile - Fastlane Screenshot Configuration for Uzumaki
+# Run with: cd apple && fastlane snapshot
+
+# Devices to capture screenshots on
+# These match App Store Connect requirements for 2025
+devices([
+  # iPhone 6.9" (required) - iPhone 17 Pro Max, 16 Pro Max, etc.
+  "iPhone 17 Pro Max",
+
+  # iPhone 6.5" (fallback for 6.9") - optional but recommended
+  # "iPhone 17 Pro",
+
+  # iPad 13" (required for iPad apps)
+  "iPad Pro 13-inch (M5)"
+])
+
+# Languages to capture (add more as needed)
+languages([
+  "en-US"
+])
+
+# Xcode scheme containing UI Tests
+scheme("Uzumaki")
+
+# Output directory for screenshots
+output_directory("./screenshots")
+
+# Clear previous screenshots before capturing new ones
+clear_previous_screenshots(true)
+
+# Project/workspace path
+project("./Uzumaki/Uzumaki.xcodeproj")
+
+# Override status bar for clean screenshots (iOS 13+)
+override_status_bar(true)
+
+# Stop if any screenshot fails
+stop_after_first_error(false)
+
+# Skip opening the HTML summary automatically
+skip_open_summary(false)
+
+# Number of retries for flaky tests
+number_of_retries(2)
+
+# Launch arguments passed to the app
+launch_arguments([
+  "-FASTLANE_SNAPSHOT YES"
+])
+
+# Use dark appearance for screenshots (matches app's default theme)
+dark_mode(true)
+
+# Concurrent screenshots (faster but uses more resources)
+concurrent_simulators(true)
+
+# Clean up simulators before running
+# erase_simulator(true)
+
+# Testplan containing screenshot tests (if using Xcode Test Plans)
+# testplan("AppStoreScreenshots")
+

@@ -1,0 +1,88 @@
+# Fastfile - Uzumaki App Store Automation
+# Documentation: https://docs.fastlane.tools
+
+default_platform(:ios)
+
+platform :ios do
+  
+  # ==========================================
+  # SCREENSHOTS
+  # ==========================================
+  
+  desc "Capture App Store screenshots for iOS and iPad"
+  lane :screenshots do
+    capture_screenshots(
+      workspace: nil,
+      project: "./Uzumaki/Uzumaki.xcodeproj",
+      scheme: "Uzumaki",
+      output_directory: "./screenshots",
+      clear_previous_screenshots: true,
+      override_status_bar: true,
+      dark_mode: true,
+      concurrent_simulators: true,
+      devices: [
+        "iPhone 17 Pro Max",
+        "iPad Pro 13-inch (M5)"
+      ],
+      languages: ["en-US"],
+      launch_arguments: ["-FASTLANE_SNAPSHOT YES"],
+      stop_after_first_error: false,
+      number_of_retries: 2
+    )
+  end
+  
+  desc "Upload screenshots to App Store Connect"
+  lane :upload_screenshots do
+    deliver(
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_app_version_update: true,
+      screenshots_path: "./screenshots",
+      overwrite_screenshots: true
+    )
+  end
+  
+  desc "Capture and upload screenshots"
+  lane :screenshots_and_upload do
+    screenshots
+    upload_screenshots
+  end
+  
+  # ==========================================
+  # FRAMES (Device Bezels)
+  # ==========================================
+  
+  desc "Add device frames to screenshots"
+  lane :frame_screenshots do
+    frame_screenshots(
+      path: "./screenshots",
+      white: false,
+      force_device_type: nil
+    )
+  end
+  
+  # ==========================================
+  # FULL WORKFLOW
+  # ==========================================
+  
+  desc "Complete screenshot workflow: capture, frame, and upload"
+  lane :full_screenshot_workflow do
+    screenshots
+    frame_screenshots
+    upload_screenshots
+  end
+
+end
+
+platform :mac do
+  
+  desc "Capture Mac App Store screenshots"
+  lane :mac_screenshots do
+    # Note: Fastlane snapshot has limited macOS support
+    # Use the manual script instead: scripts/capture-mac-screenshots.sh
+    UI.important("For macOS screenshots, run: ./scripts/capture-screenshots.sh --mac")
+    UI.important("macOS requires manual post-processing for best results")
+  end
+  
+end
+

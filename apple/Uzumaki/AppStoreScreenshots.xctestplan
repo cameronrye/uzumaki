@@ -1,0 +1,63 @@
+{
+  "configurations" : [
+    {
+      "id" : "E8F3A2B1-4C5D-6E7F-8A9B-0C1D2E3F4A5B",
+      "name" : "App Store Screenshots",
+      "options" : {
+        "uiTestingScreenshotsLifetime" : "keepAlways",
+        "testRepetitionMode" : "retryOnFailure",
+        "maximumTestRepetitions" : 2,
+        "targetForVariableExpansion" : {
+          "containerPath" : "container:Uzumaki.xcodeproj",
+          "identifier" : "Uzumaki",
+          "name" : "Uzumaki"
+        }
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "commandLineArgumentEntries" : [
+      {
+        "argument" : "-FASTLANE_SNAPSHOT YES",
+        "enabled" : true
+      },
+      {
+        "argument" : "-UIAnimationsEnabled NO",
+        "enabled" : true
+      }
+    ],
+    "environmentVariableEntries" : [
+      {
+        "key" : "SCREENSHOT_MODE",
+        "value" : "1"
+      }
+    ],
+    "language" : "en",
+    "region" : "US",
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Uzumaki.xcodeproj",
+      "identifier" : "Uzumaki",
+      "name" : "Uzumaki"
+    },
+    "testTimeoutsEnabled" : true,
+    "defaultTestExecutionTimeAllowance" : 120,
+    "maximumTestExecutionTimeAllowance" : 300,
+    "uiTestingScreenshotsLifetime" : "keepAlways"
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:Uzumaki.xcodeproj",
+        "identifier" : "AppStoreScreenshotTests",
+        "name" : "AppStoreScreenshotTests"
+      },
+      "selectedTests" : [
+        "AppStoreScreenshotTests\/testCaptureAppStoreScreenshots()"
+      ]
+    }
+  ],
+  "version" : 1
+}
+
