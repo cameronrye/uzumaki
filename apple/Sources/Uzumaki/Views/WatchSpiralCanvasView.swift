@@ -4,21 +4,23 @@ import UzumakiCore
 
 /// Simplified spiral canvas view optimized for watchOS
 /// Uses performance mode and reduced complexity for smooth rendering on watch
+/// Supports Always-On Display with dimmed rendering
 public struct WatchSpiralCanvasView: View {
     @Bindable var viewModel: WatchSpiralViewModel
-    
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+
     public init(viewModel: WatchSpiralViewModel) {
         self.viewModel = viewModel
     }
-    
+
     public var body: some View {
-        TimelineView(.animation(paused: viewModel.isPaused)) { timeline in
+        TimelineView(.animation(paused: viewModel.isPaused || isLuminanceReduced)) { timeline in
             Canvas { context, size in
                 // Generate points
                 let points = viewModel.spiralPoints
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)
-                let colors = viewModel.colors
-                
+                let colors = isLuminanceReduced ? dimmedColors : viewModel.colors
+
                 // Draw based on line style (simplified for watch)
                 switch viewModel.lineStyle {
                 case .points:
@@ -35,6 +37,11 @@ public struct WatchSpiralCanvasView: View {
             }
         }
         .background(viewModel.backgroundColor)
+    }
+
+    /// Dimmed colors for Always-On Display mode
+    private var dimmedColors: [Color] {
+        viewModel.colors.map { $0.opacity(0.3) }
     }
     
     // MARK: - Drawing Functions

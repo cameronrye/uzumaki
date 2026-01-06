@@ -7,11 +7,16 @@ import UzumakiCore
 /// - Swipe left/right: change preset
 /// - Long press: show settings
 /// - Tap: play/pause
+/// - Double-tap: reset zoom
 public struct WatchContentView: View {
     @State private var viewModel = WatchSpiralViewModel()
     @State private var crownValue: Double = 1.0
     @State private var showingSettings = false
-    @State private var showPresetName = false
+    @State private var showOverlay = false
+    @State private var overlayText = ""
+    @State private var overlayHideTask: Task<Void, Never>?
+    @State private var showOnboarding = false
+    @AppStorage("watchHasSeenOnboarding") private var hasSeenOnboarding = false
 
     public init() {}
 
@@ -31,28 +36,49 @@ public struct WatchContentView: View {
                 )
                 .onChange(of: crownValue) { _, newValue in
                     viewModel.zoom = newValue
+                    showOverlayBriefly("Zoom: \(String(format: "%.1f", newValue))x")
                 }
 
-            // Preset name overlay (shown briefly after swipe)
-            if showPresetName {
+            // Pause indicator
+            if viewModel.isPaused {
+                Image(systemName: "pause.fill")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .allowsHitTesting(false)
+            }
+
+            // Overlay text (preset name, zoom level, etc.)
+            if showOverlay {
                 VStack {
-                    Text(viewModel.currentPresetName)
+                    Spacer()
+                    Text(overlayText)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
-                    Spacer()
                 }
-                .padding(.top, 8)
+                .padding(.bottom, 8)
                 .transition(.opacity)
+                .allowsHitTesting(false)
+            }
+
+            // Onboarding overlay
+            if showOnboarding {
+                onboardingOverlay
             }
         }
         .ignoresSafeArea()
         .gesture(swipeGesture)
         .gesture(longPressGesture)
-        .onTapGesture {
+        .onTapGesture(count: 2) {
+            // Double-tap to reset zoom
+            viewModel.resetZoom()
+            crownValue = 1.0
+            showOverlayBriefly("Zoom Reset")
+        }
+        .onTapGesture(count: 1) {
             viewModel.togglePause()
         }
         .sheet(isPresented: $showingSettings) {
@@ -60,7 +86,37 @@ public struct WatchContentView: View {
         }
         .onAppear {
             crownValue = viewModel.zoom
+            if !hasSeenOnboarding {
+                showOnboarding = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showOnboarding = false
+                    }
+                    hasSeenOnboarding = true
+                }
+            }
         }
+    }
+
+    // MARK: - Onboarding Overlay
+
+    private var onboardingOverlay: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Tap to pause", systemImage: "hand.tap")
+                Label("Swipe for presets", systemImage: "arrow.left.arrow.right")
+                Label("Crown to zoom", systemImage: "digitalcrown.horizontal.arrow.clockwise")
+                Label("Hold for settings", systemImage: "gearshape")
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(12)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            Spacer().frame(height: 20)
+        }
+        .transition(.opacity)
     }
 
     // MARK: - Gestures
@@ -73,11 +129,11 @@ public struct WatchContentView: View {
                 if horizontalAmount < -30 {
                     // Swipe left - next preset
                     viewModel.nextPreset()
-                    showPresetNameBriefly()
+                    showOverlayBriefly(viewModel.currentPresetName)
                 } else if horizontalAmount > 30 {
                     // Swipe right - previous preset
                     viewModel.previousPreset()
-                    showPresetNameBriefly()
+                    showOverlayBriefly(viewModel.currentPresetName)
                 }
             }
     }
@@ -89,14 +145,22 @@ public struct WatchContentView: View {
             }
     }
 
-    private func showPresetNameBriefly() {
+    private func showOverlayBriefly(_ text: String) {
+        // Cancel any existing hide task
+        overlayHideTask?.cancel()
+
+        overlayText = text
         withAnimation(.easeIn(duration: 0.2)) {
-            showPresetName = true
+            showOverlay = true
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                showPresetName = false
+        overlayHideTask = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showOverlay = false
+                }
             }
         }
     }
@@ -133,6 +197,25 @@ struct WatchSettingsView: View {
                             Text(preset.type.displayName)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            // Line Style section
+            Section("Style") {
+                ForEach(LineStyle.allCases) { style in
+                    Button(action: {
+                        viewModel.lineStyle = style
+                        dismiss()
+                    }) {
+                        HStack {
+                            Text(style.displayName)
+                            Spacer()
+                            if viewModel.lineStyle == style {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.blue)
+                            }
                         }
                     }
                 }

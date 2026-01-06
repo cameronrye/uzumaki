@@ -1,6 +1,6 @@
 //
-//  watchkitappApp.swift
-//  watchkitapp Watch App
+//  UzumakiWatchApp.swift
+//  Uzumaki Watch App
 //
 //  Created by Cameron on 1/5/26.
 //

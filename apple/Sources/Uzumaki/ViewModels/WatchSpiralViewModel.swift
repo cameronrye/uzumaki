@@ -7,34 +7,52 @@ import WatchKit
 @Observable
 @MainActor
 public final class WatchSpiralViewModel {
-    
+
+    // MARK: - UserDefaults Keys
+
+    private enum Keys {
+        static let presetIndex = "watchPresetIndex"
+        static let colorPreset = "watchColorPreset"
+        static let lineStyle = "watchLineStyle"
+        static let zoom = "watchZoom"
+    }
+
+    private let defaults = UserDefaults.standard
+
     // MARK: - Spiral Parameters
-    
+
     public var spiralType: SpiralType = .archimedean {
         didSet {
             zoom = spiralType.defaultZoom
         }
     }
-    
+
     public var spinRate: Double = 0.5
     public var tightness: Double = 3.0
     public var stepSize: Double = 0.1
     public var numSteps: Int = 200  // Reduced for watch performance
-    
+
     // MARK: - Appearance
-    
-    public var colorPreset: ColorPreset = .rainbow
-    public var lineStyle: LineStyle = .solid
-    
+
+    public var colorPreset: ColorPreset = .rainbow {
+        didSet { saveState() }
+    }
+
+    public var lineStyle: LineStyle = .solid {
+        didSet { saveState() }
+    }
+
     // MARK: - Viewport
-    
-    public var zoom: Double = 1.0
-    
+
+    public var zoom: Double = 1.0 {
+        didSet { saveState() }
+    }
+
     // MARK: - Animation State
-    
+
     public var time: Double = 0
     public var isPaused: Bool = false
-    
+
     // Watch screen is small, use fixed viewport scale
     private let viewportScale: Double = 0.5
     
@@ -85,26 +103,67 @@ public final class WatchSpiralViewModel {
     // MARK: - Initialization
 
     public init() {
-        // Initialize with the first preset for consistent state
-        let preset = SpiralPreset.allPresets[0]
+        // Load saved state or use defaults
+        loadState()
+    }
+
+    // MARK: - State Persistence
+
+    private func saveState() {
+        defaults.set(currentPresetIndex, forKey: Keys.presetIndex)
+        defaults.set(colorPreset.rawValue, forKey: Keys.colorPreset)
+        defaults.set(lineStyle.rawValue, forKey: Keys.lineStyle)
+        defaults.set(zoom, forKey: Keys.zoom)
+    }
+
+    private func loadState() {
+        // Load preset index
+        let savedIndex = defaults.integer(forKey: Keys.presetIndex)
+        currentPresetIndex = min(savedIndex, SpiralPreset.allPresets.count - 1)
+
+        // Load preset parameters
+        let preset = SpiralPreset.allPresets[currentPresetIndex]
         spiralType = preset.type
         tightness = preset.tightness
         spinRate = preset.spinRate
         stepSize = preset.stepSize
         numSteps = min(preset.numSteps, 300)
-        colorPreset = preset.colorPreset
-        lineStyle = preset.lineStyle
-        zoom = preset.zoom
+
+        // Load saved color preset (or use preset default)
+        if let savedColor = defaults.string(forKey: Keys.colorPreset),
+           let color = ColorPreset(rawValue: savedColor) {
+            colorPreset = color
+        } else {
+            colorPreset = preset.colorPreset
+        }
+
+        // Load saved line style (or use preset default)
+        if let savedStyle = defaults.string(forKey: Keys.lineStyle),
+           let style = LineStyle(rawValue: savedStyle) {
+            lineStyle = style
+        } else {
+            lineStyle = preset.lineStyle
+        }
+
+        // Load saved zoom (or use preset default)
+        let savedZoom = defaults.double(forKey: Keys.zoom)
+        zoom = savedZoom > 0 ? savedZoom : preset.zoom
     }
 
     // MARK: - Actions
-    
+
     /// Toggle play/pause
     public func togglePause() {
         isPaused.toggle()
         WKInterfaceDevice.current().play(.click)
     }
-    
+
+    /// Reset zoom to default
+    public func resetZoom() {
+        zoom = 1.0
+        WKInterfaceDevice.current().play(.click)
+    }
+
     /// Cycle to next spiral type
     public func nextSpiralType() {
         let allTypes = SpiralType.allCases
@@ -114,7 +173,7 @@ public final class WatchSpiralViewModel {
         }
         WKInterfaceDevice.current().play(.click)
     }
-    
+
     /// Cycle to next color preset
     public func nextColorPreset() {
         let allPresets = ColorPreset.allCases
@@ -124,7 +183,7 @@ public final class WatchSpiralViewModel {
         }
         WKInterfaceDevice.current().play(.click)
     }
-    
+
     /// Load a preset
     public func loadPreset(_ preset: SpiralPreset) {
         spiralType = preset.type
@@ -137,12 +196,15 @@ public final class WatchSpiralViewModel {
         lineStyle = preset.lineStyle
         zoom = preset.zoom
         currentPresetIndex = SpiralPreset.allPresets.firstIndex(where: { $0.id == preset.id }) ?? 0
+        saveState()
         WKInterfaceDevice.current().play(.success)
     }
 
     // MARK: - Preset Navigation
 
-    private var currentPresetIndex: Int = 0
+    private var currentPresetIndex: Int = 0 {
+        didSet { saveState() }
+    }
 
     /// Load the next preset (swipe left)
     public func nextPreset() {

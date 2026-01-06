@@ -145,7 +145,7 @@ capture_watch() {
 
     # For watchOS, we use simctl directly since test support is limited
     log_info "Launching watch app..."
-    xcrun simctl launch "$WATCH_DEVICE" com.uzumaki.app.watchkitapp || true
+    xcrun simctl launch "$WATCH_DEVICE" com.uzumaki.app.watch || true
     sleep 3
 
     # Capture screenshots via simctl
