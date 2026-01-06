@@ -28,6 +28,9 @@ public struct ContentView: View {
     @State private var currentPan: CGSize = .zero
     @State private var showOnboardingHint: Bool = true
 
+    // iPad sidebar visibility
+    @State private var isSidebarVisible: Bool = true
+
     // Enhanced gesture tracking
     @State private var lastMagnification: CGFloat = 1.0
     @State private var canvasSize: CGSize = .zero
@@ -163,24 +166,51 @@ public struct ContentView: View {
 
     /// iPad layout with side panel for controls
     private var iPadLayout: some View {
-        HStack(spacing: 0) {
-            // Main canvas area
-            ZStack {
-                spiralCanvas
+        ZStack(alignment: .topTrailing) {
+            HStack(spacing: 0) {
+                // Main canvas area
+                ZStack {
+                    spiralCanvas
 
-                // Gesture hint (first launch)
-                if showOnboardingHint {
-                    VStack {
-                        Spacer()
-                        gestureHint
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                            .padding(.bottom, 20)
+                    // Gesture hint (first launch)
+                    if showOnboardingHint {
+                        VStack {
+                            Spacer()
+                            gestureHint
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                .padding(.bottom, 20)
+                        }
                     }
+                }
+
+                // Side panel with controls (animated)
+                if isSidebarVisible {
+                    iPadSidePanel
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
 
-            // Side panel with controls
-            iPadSidePanel
+            // Sidebar toggle button (only shown when sidebar is hidden)
+            if !isSidebarVisible {
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isSidebarVisible.toggle()
+                    }
+                }) {
+                    Image(systemName: "sidebar.leading")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                }
+                .padding(.top, 16)
+                .padding(.trailing, 16)
+                .accessibilityLabel("Show Controls")
+                .accessibilityHint("Double-tap to show the controls panel")
+                .transition(.opacity)
+            }
         }
     }
 
@@ -188,12 +218,23 @@ public struct ContentView: View {
     private var iPadSidePanel: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Header
+                // Header with toggle button
                 HStack {
                     Text("Controls")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.white)
                     Spacer()
+                    Button(action: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isSidebarVisible = false
+                        }
+                    }) {
+                        Image(systemName: "sidebar.trailing")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .accessibilityLabel("Hide Controls")
+                    .accessibilityHint("Double-tap to hide the controls panel")
                 }
                 .padding(.bottom, 8)
 
