@@ -13,32 +13,35 @@ public struct ControlsView: View {
         self.onExport = onExport
         self.onShare = onShare
     }
-    
+
     public var body: some View {
+        controlsContent
+            .adaptiveGlassRoundedRect(cornerRadius: 20)
+    }
+
+    @ViewBuilder
+    private var controlsContent: some View {
         VStack(spacing: 0) {
             // Action bar (always visible)
             actionBar
-            
+
             if isExpanded {
                 Divider()
                     .background(Color.white.opacity(0.1))
-                
+
                 // Type and style selectors
                 configSection
-                
+
                 Divider()
                     .background(Color.white.opacity(0.1))
-                
+
                 // Sliders
                 slidersSection
-                
+
                 // Toggles
                 togglesSection
             }
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
     }
     
     // MARK: - Action Bar
@@ -48,6 +51,7 @@ public struct ControlsView: View {
             Button(action: viewModel.togglePause) {
                 Image(systemName: viewModel.isPaused ? "play.fill" : "pause.fill")
                     .font(.system(size: 16, weight: .medium))
+                    .adaptiveSymbolTransition()
             }
             .help(viewModel.isPaused ? "Play (Space)" : "Pause (Space)")
 
@@ -72,11 +76,13 @@ public struct ControlsView: View {
             }
             .help("Share")
 
-            // Favorite button with brand gradient
+            // Favorite button with brand gradient and symbol effects
             Button(action: { viewModel.toggleFavorite() }) {
                 Image(systemName: viewModel.isFavorited ? "heart.fill" : "heart")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(viewModel.isFavorited ? AnyShapeStyle(BrandColors.gradient) : AnyShapeStyle(.white))
+                    .symbolEffect(.bounce, value: viewModel.isFavorited)
+                    .adaptiveSymbolTransition()
             }
             .help(viewModel.isFavorited ? "Remove from favorites" : "Add to favorites")
 
@@ -85,6 +91,7 @@ public struct ControlsView: View {
             Button(action: { isExpanded.toggle() }) {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
                     .font(.system(size: 14, weight: .medium))
+                    .adaptiveSymbolTransition()
             }
             .help(isExpanded ? "Collapse" : "Expand")
         }
@@ -175,8 +182,7 @@ public struct ControlsView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
     }
 
     // MARK: - Sliders Section
@@ -270,26 +276,54 @@ public struct ControlsView: View {
     }
 }
 
-// MARK: - Chip Toggle Style
+// MARK: - Chip Toggle Style (iOS 26 Glass Enhanced)
 
 struct ChipToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button(action: { configuration.isOn.toggle() }) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(configuration.isOn ? Color.white : Color.white.opacity(0.3))
-                    .frame(width: 8, height: 8)
-
-                configuration.label
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(configuration.isOn ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
-            .clipShape(Capsule())
+            chipContent(configuration: configuration)
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func chipContent(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(configuration.isOn ? Color.white : Color.white.opacity(0.3))
+                .frame(width: 8, height: 8)
+
+            configuration.label
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .adaptiveChipBackground(isOn: configuration.isOn)
+    }
+}
+
+// MARK: - Adaptive Chip Background
+
+extension View {
+    @ViewBuilder
+    func adaptiveChipBackground(isOn: Bool) -> some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            self.background {
+                if isOn {
+                    Capsule()
+                        .fill(.white.opacity(0.15))
+                } else {
+                    Capsule()
+                        .fill(.clear)
+                }
+            }
+            .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            self
+                .background(isOn ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
+                .clipShape(Capsule())
+        }
     }
 }
 

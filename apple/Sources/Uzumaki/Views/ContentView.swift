@@ -16,30 +16,32 @@ public struct ContentView: View {
             // Background
             viewModel.backgroundColor
                 .ignoresSafeArea()
-            
+
             // Spiral Canvas with gestures
             SpiralCanvasView(viewModel: viewModel)
                 .gesture(zoomGesture)
                 .gesture(panGesture)
                 .ignoresSafeArea()
-            
-            // UI Overlay
-            VStack {
-                // Header
-                header
-                
-                Spacer()
-                
-                // Zoom indicator
-                zoomIndicator
-                    .padding(.bottom, 8)
-                
-                // Controls
-                ControlsView(viewModel: viewModel, onExport: exportSpiral, onShare: shareSpiral)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+
+            // UI Overlay - wrapped in AdaptiveGlassContainer for iOS 26+
+            AdaptiveGlassContainer {
+                VStack {
+                    // Header with subtle glass
+                    header
+
+                    Spacer()
+
+                    // Zoom indicator
+                    zoomIndicator
+                        .padding(.bottom, 8)
+
+                    // Controls
+                    ControlsView(viewModel: viewModel, onExport: exportSpiral, onShare: shareSpiral)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                }
             }
-            
+
             // Toast
             if let message = viewModel.toastMessage {
                 toastView(message: message)
@@ -72,12 +74,13 @@ public struct ContentView: View {
             Text("UZUMAKI")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
-
-            Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .adaptiveGlassCapsule()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.top, 16)
-        .opacity(0.6)
     }
 
     // MARK: - Zoom Indicator
@@ -86,17 +89,16 @@ public struct ContentView: View {
         HStack(spacing: 16) {
             Text("Zoom: \(viewModel.zoom, specifier: "%.1f")x")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
-            
+
             if viewModel.panX != 0 || viewModel.panY != 0 {
                 Text("Pan: \(Int(viewModel.panX)), \(Int(viewModel.panY))")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
             }
         }
-        .foregroundStyle(.white.opacity(0.5))
+        .foregroundStyle(.white.opacity(0.7))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
+        .adaptiveGlassCapsule()
     }
     
     // MARK: - Toast
@@ -104,16 +106,15 @@ public struct ContentView: View {
     private func toastView(message: String) -> some View {
         VStack {
             Spacer()
-            
+
             Text(message)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.black.opacity(0.8))
-                .clipShape(Capsule())
+                .adaptiveGlassCapsule()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-            
+
             Spacer().frame(height: 100)
         }
         .animation(.spring(duration: 0.3), value: viewModel.toastMessage)
