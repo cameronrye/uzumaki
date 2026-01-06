@@ -17,24 +17,43 @@ public final class SpiralViewModel {
             panX = 0
             panY = 0
             triggerSelectionFeedback()
+            saveSettings()
         }
     }
-    
-    public var spinRate: Double = 0.5
-    public var tightness: Double = 3.0
-    public var stepSize: Double = 0.1
-    public var numSteps: Int = 500
-    
+
+    public var spinRate: Double = 0.5 {
+        didSet { saveSettings() }
+    }
+    public var tightness: Double = 3.0 {
+        didSet { saveSettings() }
+    }
+    public var stepSize: Double = 0.1 {
+        didSet { saveSettings() }
+    }
+    public var numSteps: Int = 500 {
+        didSet { saveSettings() }
+    }
+
     // MARK: - Appearance
-    
-    public var colorPreset: ColorPreset = .rainbow
-    public var lineStyle: LineStyle = .solid
-    public var backgroundTheme: BackgroundTheme = .dark
-    
+
+    public var colorPreset: ColorPreset = .rainbow {
+        didSet { saveSettings() }
+    }
+    public var lineStyle: LineStyle = .solid {
+        didSet { saveSettings() }
+    }
+    public var backgroundTheme: BackgroundTheme = .dark {
+        didSet { saveSettings() }
+    }
+
     // MARK: - Options
-    
-    public var performanceMode: Bool = false
-    public var lineThicknessVariation: Bool = false
+
+    public var performanceMode: Bool = false {
+        didSet { saveSettings() }
+    }
+    public var lineThicknessVariation: Bool = false {
+        didSet { saveSettings() }
+    }
     
     // MARK: - Viewport
     
@@ -140,9 +159,62 @@ public final class SpiralViewModel {
     }
     
     // MARK: - Initialization
-    
-    public init() {}
-    
+
+    public init() {
+        loadSettings()
+    }
+
+    // MARK: - Persistence
+
+    /// Flag to prevent saving while loading
+    private var isLoadingSettings = false
+
+    /// Load saved settings from UserDefaults
+    private func loadSettings() {
+        isLoadingSettings = true
+        defer { isLoadingSettings = false }
+
+        let settings = UserSettings.shared
+
+        // Only load if user has launched before (otherwise use defaults)
+        guard settings.hasLaunchedBefore else {
+            settings.hasLaunchedBefore = true
+            return
+        }
+
+        spiralType = settings.spiralType
+        colorPreset = settings.colorPreset
+        lineStyle = settings.lineStyle
+        backgroundTheme = settings.backgroundTheme
+        performanceMode = settings.performanceMode
+        lineThicknessVariation = settings.lineThicknessVariation
+        spinRate = settings.spinRate
+        tightness = settings.tightness
+        stepSize = settings.stepSize
+        numSteps = settings.numSteps
+
+        // Reset zoom to match loaded spiral type
+        zoom = spiralType.defaultZoom
+    }
+
+    /// Save current settings to UserDefaults
+    private func saveSettings() {
+        // Don't save while loading
+        guard !isLoadingSettings else { return }
+
+        let settings = UserSettings.shared
+        settings.spiralType = spiralType
+        settings.colorPreset = colorPreset
+        settings.lineStyle = lineStyle
+        settings.backgroundTheme = backgroundTheme
+        settings.performanceMode = performanceMode
+        settings.lineThicknessVariation = lineThicknessVariation
+        settings.spinRate = spinRate
+        settings.tightness = tightness
+        settings.stepSize = stepSize
+        settings.numSteps = numSteps
+    }
+
     // MARK: - Actions
 
     /// Toggle play/pause

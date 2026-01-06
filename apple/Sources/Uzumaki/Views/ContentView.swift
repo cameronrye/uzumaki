@@ -4,6 +4,20 @@ import UzumakiCore
 import UIKit
 #endif
 
+// MARK: - Cross-Platform Hover Effect
+
+extension View {
+    /// Applies hover effect on iOS (for trackpad/mouse), no-op on macOS
+    @ViewBuilder
+    func adaptiveHoverEffect() -> some View {
+        #if os(iOS)
+        self.hoverEffect(.lift)
+        #else
+        self
+        #endif
+    }
+}
+
 /// Main content view for the Uzumaki app
 public struct ContentView: View {
     @State private var viewModel = SpiralViewModel()
@@ -13,11 +27,35 @@ public struct ContentView: View {
     @State private var currentPan: CGSize = .zero
     @State private var showOnboardingHint: Bool = true
 
+    // Enhanced gesture tracking
+    @State private var lastMagnification: CGFloat = 1.0
+    @State private var gestureLocation: CGPoint = .zero
+    @State private var canvasSize: CGSize = .zero
+    @State private var hitZoomBoundary: Bool = false
+    @State private var isGestureActive: Bool = false
+
+    // Pre-prepared haptic generators for lower latency (iOS only)
+    #if os(iOS)
+    @State private var lightImpactGenerator = UIImpactFeedbackGenerator(style: .light)
+    @State private var mediumImpactGenerator = UIImpactFeedbackGenerator(style: .medium)
+    #endif
+
     // Permission alert state
     @State private var showPhotoPermissionAlert: Bool = false
 
-    // Environment for reduced motion
+    // Environment for reduced motion and horizontal size class
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// Whether to use iPad landscape layout (side panel)
+    private var useIPadLayout: Bool {
+        #if os(iOS)
+        return horizontalSizeClass == .regular && verticalSizeClass == .regular
+        #else
+        return false
+        #endif
+    }
 
     public init() {}
 
@@ -27,39 +65,11 @@ public struct ContentView: View {
             viewModel.backgroundColor
                 .ignoresSafeArea()
 
-            // Spiral Canvas with gestures
-            GeometryReader { geometry in
-                SpiralCanvasView(viewModel: viewModel)
-                    .gesture(doubleTapGesture)
-                    .gesture(zoomGesture)
-                    .gesture(panGesture)
-                    .onAppear {
-                        viewModel.updateViewportScale(for: geometry.size)
-                    }
-                    .onChange(of: geometry.size) { _, newSize in
-                        viewModel.updateViewportScale(for: newSize)
-                    }
-            }
-            .ignoresSafeArea()
-
-            // UI Overlay - wrapped in AdaptiveGlassContainer for iOS 26+
-            AdaptiveGlassContainer {
-                VStack {
-                    Spacer()
-
-                    // Gesture hint (first launch)
-                    if showOnboardingHint {
-                        gestureHint
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-
-                    Spacer().frame(height: 8)
-
-                    // Controls
-                    ControlsView(viewModel: viewModel, onExport: exportSpiral, onShare: shareSpiral)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 20)
-                }
+            // Use iPad side panel layout or standard overlay layout
+            if useIPadLayout {
+                iPadLayout
+            } else {
+                standardLayout
             }
 
             // Toast (at top)
@@ -115,6 +125,355 @@ public struct ContentView: View {
             Text("Uzumaki needs access to your Photo Library to save spirals. Please enable access in Settings.")
         }
         #endif
+    }
+
+    // MARK: - Layout Views
+
+    /// Standard overlay layout (iPhone and compact iPad)
+    private var standardLayout: some View {
+        ZStack {
+            spiralCanvas
+
+            // UI Overlay - wrapped in AdaptiveGlassContainer for iOS 26+
+            AdaptiveGlassContainer {
+                VStack {
+                    Spacer()
+
+                    // Gesture hint (first launch)
+                    if showOnboardingHint {
+                        gestureHint
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    Spacer().frame(height: 8)
+
+                    // Controls
+                    ControlsView(viewModel: viewModel, onExport: exportSpiral, onShare: shareSpiral)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                }
+            }
+        }
+    }
+
+    /// iPad layout with side panel for controls
+    private var iPadLayout: some View {
+        HStack(spacing: 0) {
+            // Main canvas area
+            ZStack {
+                spiralCanvas
+
+                // Gesture hint (first launch)
+                if showOnboardingHint {
+                    VStack {
+                        Spacer()
+                        gestureHint
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .padding(.bottom, 20)
+                    }
+                }
+            }
+
+            // Side panel with controls
+            iPadSidePanel
+        }
+    }
+
+    /// iPad side panel with controls
+    private var iPadSidePanel: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Header
+                HStack {
+                    Text("Controls")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                .padding(.bottom, 8)
+
+                // Spiral type picker
+                iPadSpiralTypePicker
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Parameter sliders
+                iPadParameterSliders
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Appearance options
+                iPadAppearanceSection
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Quick presets
+                iPadPresetsSection
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Action buttons
+                iPadActionButtons
+
+                Spacer(minLength: 20)
+            }
+            .padding(20)
+        }
+        .frame(width: 320)
+        .background(Color.black.opacity(0.3))
+        .background(.ultraThinMaterial)
+    }
+
+    // MARK: - iPad Side Panel Components
+
+    private var iPadSpiralTypePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Spiral Type")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(SpiralType.allCases) { type in
+                    Button(action: { viewModel.spiralType = type }) {
+                        Text(type.displayName)
+                            .font(.caption.weight(.medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(viewModel.spiralType == type ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(viewModel.spiralType == type ? Color.white.opacity(0.4) : Color.clear, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .adaptiveHoverEffect()
+                }
+            }
+        }
+    }
+
+    private var iPadParameterSliders: some View {
+        VStack(spacing: 12) {
+            iPadSlider(label: "Animation Speed", value: $viewModel.spinRate, range: Constants.spinRateMin...Constants.spinRateMax, format: "%.2f")
+            iPadSlider(label: "Spiral Density", value: $viewModel.tightness, range: Constants.tightnessMin...Constants.tightnessMax, format: "%.1f")
+            iPadSlider(label: "Smoothness", value: $viewModel.stepSize, range: Constants.stepSizeMin...Constants.stepSizeMax, format: "%.2f")
+
+            // Complexity slider (Int)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Complexity")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Spacer()
+                    Text("\(viewModel.numSteps)")
+                        .font(.caption.weight(.semibold).monospaced())
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(viewModel.numSteps) },
+                        set: { viewModel.numSteps = Int($0) }
+                    ),
+                    in: Double(Constants.numStepsMin)...Double(Constants.numStepsMax),
+                    step: Double(Constants.numStepsStep)
+                )
+                .tint(.white.opacity(0.8))
+            }
+        }
+    }
+
+    private func iPadSlider(label: String, value: Binding<Double>, range: ClosedRange<Double>, format: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text(String(format: format, value.wrappedValue))
+                    .font(.caption.weight(.semibold).monospaced())
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            Slider(value: value, in: range)
+                .tint(.white.opacity(0.8))
+        }
+    }
+
+    private var iPadAppearanceSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Appearance")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            // Color preset
+            iPadPickerRow(title: "Colors", selection: $viewModel.colorPreset) { preset in
+                HStack(spacing: 2) {
+                    ForEach(0..<min(3, preset.colors.count), id: \.self) { index in
+                        Circle().fill(preset.colors[index]).frame(width: 8, height: 8)
+                    }
+                }
+            }
+
+            // Line style
+            iPadPickerRow(title: "Line Style", selection: $viewModel.lineStyle) { _ in EmptyView() }
+
+            // Background
+            iPadPickerRow(title: "Background", selection: $viewModel.backgroundTheme) { _ in EmptyView() }
+
+            // Toggles
+            Toggle("Variable Thickness", isOn: $viewModel.lineThicknessVariation)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .tint(.white.opacity(0.8))
+
+            Toggle("Performance Mode", isOn: $viewModel.performanceMode)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .tint(.white.opacity(0.8))
+        }
+    }
+
+    private func iPadPickerRow<T: CaseIterable & Identifiable & RawRepresentable, Content: View>(
+        title: String,
+        selection: Binding<T>,
+        @ViewBuilder preview: @escaping (T) -> Content
+    ) -> some View where T.RawValue == String, T.AllCases: RandomAccessCollection {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.8))
+            Spacer()
+            Menu {
+                ForEach(Array(T.allCases), id: \.id) { item in
+                    Button(action: { selection.wrappedValue = item }) {
+                        Text(item.rawValue.capitalized)
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    preview(selection.wrappedValue)
+                    Text(selection.wrappedValue.rawValue.capitalized)
+                        .font(.caption.weight(.medium))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.1)))
+            }
+        }
+    }
+
+    private var iPadPresetsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Presets")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(SpiralPreset.allPresets) { preset in
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            viewModel.loadPreset(preset)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            ForEach(0..<min(3, preset.colorPreset.colors.count), id: \.self) { index in
+                                Circle().fill(preset.colorPreset.colors[index]).frame(width: 4, height: 4)
+                            }
+                            Text(preset.name)
+                                .font(.caption2.weight(.medium))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 6)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.08)))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .adaptiveHoverEffect()
+                }
+            }
+        }
+    }
+
+    private var iPadActionButtons: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Play/Pause
+                Button(action: viewModel.togglePause) {
+                    Label(viewModel.isPaused ? "Play" : "Pause", systemImage: viewModel.isPaused ? "play.fill" : "pause.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white.opacity(0.2))
+                .foregroundStyle(.white)
+                .adaptiveHoverEffect()
+
+                // Reset
+                Button(action: resetView) {
+                    Label("Reset", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white.opacity(0.2))
+                .foregroundStyle(.white)
+                .adaptiveHoverEffect()
+            }
+
+            HStack(spacing: 12) {
+                // Export
+                Button(action: exportSpiral) {
+                    Label("Export", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white.opacity(0.2))
+                .foregroundStyle(.white)
+                .adaptiveHoverEffect()
+
+                // Share
+                Button(action: shareSpiral) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white.opacity(0.2))
+                .foregroundStyle(.white)
+                .adaptiveHoverEffect()
+            }
+        }
+    }
+
+    // MARK: - Shared Components
+
+    /// The spiral canvas with gestures
+    private var spiralCanvas: some View {
+        GeometryReader { geometry in
+            SpiralCanvasView(viewModel: viewModel)
+                .gesture(doubleTapGesture)
+                .gesture(combinedZoomPanGesture)
+                .onAppear {
+                    canvasSize = geometry.size
+                    viewModel.updateViewportScale(for: geometry.size)
+                    // Pre-prepare haptic generators for lower latency
+                    #if os(iOS)
+                    lightImpactGenerator.prepare()
+                    mediumImpactGenerator.prepare()
+                    #endif
+                }
+                .onChange(of: geometry.size) { _, newSize in
+                    canvasSize = newSize
+                    viewModel.updateViewportScale(for: newSize)
+                }
+        }
+        .ignoresSafeArea()
     }
 
     // MARK: - Keyboard Shortcuts
@@ -197,25 +556,110 @@ public struct ContentView: View {
             }
     }
 
+    /// Combined zoom and pan gesture for simultaneous recognition
+    private var combinedZoomPanGesture: some Gesture {
+        SimultaneousGesture(zoomGesture, panGesture)
+    }
+
+    /// Enhanced zoom gesture with anchor point and haptic feedback
     private var zoomGesture: some Gesture {
         MagnificationGesture()
             .onChanged { scale in
-                let newZoom = currentZoom * scale
-                viewModel.zoom = max(Constants.zoomMin, min(Constants.zoomMax, newZoom))
+                isGestureActive = true
+
+                // Calculate zoom delta from last magnification value
+                let delta = scale / lastMagnification
+                let proposedZoom = viewModel.zoom * delta
+                let clampedZoom = max(Constants.zoomMin, min(Constants.zoomMax, proposedZoom))
+
+                // Haptic feedback when hitting zoom boundaries
+                #if os(iOS)
+                if proposedZoom != clampedZoom && !hitZoomBoundary {
+                    lightImpactGenerator.impactOccurred()
+                    hitZoomBoundary = true
+                } else if proposedZoom == clampedZoom {
+                    hitZoomBoundary = false
+                }
+                #endif
+
+                // Anchor zoom to gesture center point (pinch location)
+                // This keeps the point under the user's fingers stable during zoom
+                if gestureLocation != .zero && canvasSize != .zero {
+                    let centerX = canvasSize.width / 2
+                    let centerY = canvasSize.height / 2
+
+                    // Calculate offset from center to gesture point
+                    let offsetX = gestureLocation.x - centerX
+                    let offsetY = gestureLocation.y - centerY
+
+                    // Adjust pan to compensate for zoom change around gesture point
+                    let zoomRatio = clampedZoom / viewModel.zoom
+                    let panAdjustX = offsetX * (1 - zoomRatio)
+                    let panAdjustY = offsetY * (1 - zoomRatio)
+
+                    viewModel.panX += panAdjustX
+                    viewModel.panY += panAdjustY
+                }
+
+                viewModel.zoom = clampedZoom
+                lastMagnification = scale
             }
-            .onEnded { scale in
+            .onEnded { _ in
                 currentZoom = viewModel.zoom
+                lastMagnification = 1.0
+                hitZoomBoundary = false
+                isGestureActive = false
+                currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
             }
     }
 
+    /// Enhanced pan gesture with minimum distance, zoom-scaled speed, momentum, and dynamic bounds
     private var panGesture: some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 5) // Prevent accidental pan on tap
             .onChanged { value in
-                viewModel.panX = currentPan.width + value.translation.width
-                viewModel.panY = currentPan.height + value.translation.height
+                isGestureActive = true
+
+                // Update gesture location for zoom anchoring
+                gestureLocation = value.location
+
+                // Scale pan speed by zoom level - move slower when zoomed in for precision
+                let zoomScale = max(1.0, viewModel.zoom)
+                let scaledTranslationX = value.translation.width / zoomScale
+                let scaledTranslationY = value.translation.height / zoomScale
+
+                let newPanX = currentPan.width + scaledTranslationX
+                let newPanY = currentPan.height + scaledTranslationY
+
+                // Apply dynamic bounds based on zoom level
+                let maxPan = Constants.panLimit / viewModel.zoom
+                viewModel.panX = max(-maxPan, min(maxPan, newPanX))
+                viewModel.panY = max(-maxPan, min(maxPan, newPanY))
             }
             .onEnded { value in
-                currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
+                // Calculate momentum using predicted end translation
+                let zoomScale = max(1.0, viewModel.zoom)
+                let maxPan = Constants.panLimit / viewModel.zoom
+
+                // Use predicted translation for natural momentum/inertia
+                let predictedX = currentPan.width + value.predictedEndTranslation.width / zoomScale
+                let predictedY = currentPan.height + value.predictedEndTranslation.height / zoomScale
+
+                // Clamp to bounds
+                let finalX = max(-maxPan, min(maxPan, predictedX))
+                let finalY = max(-maxPan, min(maxPan, predictedY))
+
+                // Animate to predicted position with deceleration
+                withAnimation(.easeOut(duration: 0.3)) {
+                    viewModel.panX = finalX
+                    viewModel.panY = finalY
+                }
+
+                // Update current pan after a short delay to match animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
+                }
+
+                isGestureActive = false
             }
     }
 
@@ -228,11 +672,12 @@ public struct ContentView: View {
             viewModel.panY = 0
             currentZoom = viewModel.zoom
             currentPan = .zero
+            gestureLocation = .zero
         }
         #if os(iOS)
-        // Haptic feedback on iOS
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        // Haptic feedback using pre-prepared generator for lower latency
+        mediumImpactGenerator.impactOccurred()
+        mediumImpactGenerator.prepare() // Re-prepare for next use
         #endif
     }
 
@@ -241,10 +686,18 @@ public struct ContentView: View {
     private func exportSpiral() {
         Task {
             if #available(macOS 14.0, iOS 17.0, *) {
-                if let data = await ExportManager.exportAsPNG(viewModel: viewModel) {
+                do {
+                    let data = try await ExportManager.exportAsPNG(viewModel: viewModel)
                     #if os(macOS)
-                    ExportManager.savePNG(data: data)
-                    viewModel.showToast("Spiral exported!")
+                    do {
+                        try await ExportManager.savePNG(data: data)
+                        viewModel.showToast("Spiral exported!")
+                        viewModel.triggerSuccessFeedback()
+                    } catch ExportError.saveCancelled {
+                        // User cancelled, no need to show error
+                    } catch {
+                        viewModel.showToast(error.localizedDescription)
+                    }
                     #else
                     // On iOS, save to Photos
                     let result = await ExportManager.saveToPhotos(data: data)
@@ -254,12 +707,13 @@ public struct ContentView: View {
                         viewModel.triggerSuccessFeedback()
                     case .permissionDenied:
                         showPhotoPermissionAlert = true
-                    case .failed:
-                        viewModel.showToast("Could not save to Photos")
+                    case .failed(let error):
+                        let message = error?.localizedDescription ?? "Unknown error"
+                        viewModel.showToast("Could not save: \(message)")
                     }
                     #endif
-                } else {
-                    viewModel.showToast("Export failed")
+                } catch {
+                    viewModel.showToast(error.localizedDescription)
                 }
             } else {
                 viewModel.showToast("Export requires iOS 17+ / macOS 14+")
@@ -270,15 +724,15 @@ public struct ContentView: View {
     private func shareSpiral() {
         Task {
             if #available(macOS 14.0, iOS 17.0, *) {
-                if let data = await ExportManager.exportAsPNG(viewModel: viewModel) {
+                do {
+                    let data = try await ExportManager.exportAsPNG(viewModel: viewModel)
                     #if os(iOS)
                     ExportManager.share(data: data)
                     #else
-                    // macOS: use proper share sheet
                     ExportManager.share(data: data)
                     #endif
-                } else {
-                    viewModel.showToast("Share failed")
+                } catch {
+                    viewModel.showToast(error.localizedDescription)
                 }
             }
         }

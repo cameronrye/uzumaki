@@ -6,6 +6,36 @@ import UIKit
 import Photos
 #endif
 
+/// Errors that can occur during export operations
+public enum ExportError: LocalizedError {
+    case renderingFailed
+    case imageConversionFailed
+    case pngEncodingFailed
+    case saveCancelled
+    case saveFailed(Error)
+    case shareSetupFailed
+    case invalidImageData
+
+    public var errorDescription: String? {
+        switch self {
+        case .renderingFailed:
+            return "Failed to render the spiral image"
+        case .imageConversionFailed:
+            return "Failed to convert the image"
+        case .pngEncodingFailed:
+            return "Failed to encode the image as PNG"
+        case .saveCancelled:
+            return "Save was cancelled"
+        case .saveFailed(let error):
+            return "Failed to save: \(error.localizedDescription)"
+        case .shareSetupFailed:
+            return "Failed to set up sharing"
+        case .invalidImageData:
+            return "Invalid image data"
+        }
+    }
+}
+
 /// Handles exporting spiral canvas as images
 @MainActor
 public struct ExportManager {
@@ -15,37 +45,51 @@ public struct ExportManager {
     public static func exportAsPNG(
         viewModel: SpiralViewModel,
         size: CGSize = CGSize(width: 2048, height: 2048)
-    ) async -> Data? {
+    ) async throws -> Data {
         let renderer = ImageRenderer(content: ExportableCanvas(viewModel: viewModel, size: size))
         renderer.scale = 2.0  // Retina
 
         #if os(macOS)
-        guard let nsImage = renderer.nsImage else { return nil }
+        guard let nsImage = renderer.nsImage else {
+            throw ExportError.renderingFailed
+        }
         guard let tiffData = nsImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData) else { return nil }
-        return bitmap.representation(using: .png, properties: [:])
+              let bitmap = NSBitmapImageRep(data: tiffData) else {
+            throw ExportError.imageConversionFailed
+        }
+        guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            throw ExportError.pngEncodingFailed
+        }
+        return pngData
         #else
-        guard let uiImage = renderer.uiImage else { return nil }
-        return uiImage.pngData()
+        guard let uiImage = renderer.uiImage else {
+            throw ExportError.renderingFailed
+        }
+        guard let pngData = uiImage.pngData() else {
+            throw ExportError.pngEncodingFailed
+        }
+        return pngData
         #endif
     }
 
     /// Save PNG to the user's chosen location (macOS)
     #if os(macOS)
-    public static func savePNG(data: Data, filename: String = "uzumaki-spiral.png") {
+    public static func savePNG(data: Data, filename: String = "uzumaki-spiral.png") async throws {
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.png]
         savePanel.nameFieldStringValue = filename
         savePanel.canCreateDirectories = true
 
-        savePanel.begin { result in
-            if result == .OK, let url = savePanel.url {
-                do {
-                    try data.write(to: url)
-                } catch {
-                    print("Failed to save: \(error)")
-                }
-            }
+        let result = await savePanel.begin()
+
+        guard result == .OK, let url = savePanel.url else {
+            throw ExportError.saveCancelled
+        }
+
+        do {
+            try data.write(to: url)
+        } catch {
+            throw ExportError.saveFailed(error)
         }
     }
 

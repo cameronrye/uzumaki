@@ -1,7 +1,7 @@
 import Foundation
 
 /// Complete spiral parameters matching the web SpiralParams interface
-public struct SpiralParams: Equatable, Sendable {
+public struct SpiralParams: Equatable, Sendable, Codable {
     // MARK: - Spiral Generation
     public var type: SpiralType
     public var tightness: Double      // Controls spacing between turns
