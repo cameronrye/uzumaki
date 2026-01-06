@@ -23,6 +23,11 @@
   <img src="assets/demo.gif" alt="Uzumaki Demo" width="640">
 </p>
 
+<p align="center">
+  <img src="assets/demo-fibonacci.gif" alt="Fibonacci Spiral" width="300">
+  <img src="assets/demo-vogel.gif" alt="Vogel Sunflower" width="300">
+</p>
+
 ## Features
 
 - 10 spiral types: Archimedean, Fibonacci, Fermat, Logarithmic, Hyperbolic, Lituus, Theodorus, Vogel, Uzumaki, and Curlicue
@@ -41,16 +46,37 @@
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/hero.png" width="400"><br><strong>Golden Spiral</strong></td>
-    <td align="center"><img src="assets/screenshots/chaos.png" width="400"><br><strong>Uzumaki Chaos</strong></td>
+    <td align="center"><img src="assets/screenshots/hero.png" width="400"><br><strong>Fibonacci Aurora</strong></td>
+    <td align="center"><img src="assets/screenshots/chaos.png" width="400"><br><strong>Uzumaki Neon</strong></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/sunflower.png" width="400"><br><strong>Sunflower (Vogel)</strong></td>
-    <td align="center"><img src="assets/screenshots/spirals/curlicue.png" width="400"><br><strong>Curlicue Fractal</strong></td>
+    <td align="center"><img src="assets/screenshots/sunflower.png" width="400"><br><strong>Vogel Sunflower</strong></td>
+    <td align="center"><img src="assets/screenshots/ocean-log.png" width="400"><br><strong>Logarithmic Ocean</strong></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/spirals/theodorus.png" width="400"><br><strong>Wheel of Theodorus</strong></td>
-    <td align="center"><img src="assets/screenshots/colors/neon.png" width="400"><br><strong>Neon Colors</strong></td>
+    <td align="center"><img src="assets/screenshots/fire-fermat.png" width="400"><br><strong>Fermat Fire</strong></td>
+    <td align="center"><img src="assets/screenshots/matrix-curlicue.png" width="400"><br><strong>Curlicue Matrix</strong></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/retro-theodorus.png" width="400"><br><strong>Theodorus Retro</strong></td>
+    <td align="center"><img src="assets/screenshots/candy-lituus.png" width="400"><br><strong>Lituus Candy</strong></td>
+  </tr>
+</table>
+
+### Color Presets
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/colors/rainbow.png" width="200"><br><sub>Rainbow</sub></td>
+    <td align="center"><img src="assets/screenshots/colors/aurora.png" width="200"><br><sub>Aurora</sub></td>
+    <td align="center"><img src="assets/screenshots/colors/sunset.png" width="200"><br><sub>Sunset</sub></td>
+    <td align="center"><img src="assets/screenshots/colors/ocean.png" width="200"><br><sub>Ocean</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/colors/fire.png" width="200"><br><sub>Fire</sub></td>
+    <td align="center"><img src="assets/screenshots/colors/neon.png" width="200"><br><sub>Neon</sub></td>
+    <td align="center"><img src="assets/screenshots/colors/candy.png" width="200"><br><sub>Candy</sub></td>
+    <td align="center"><img src="assets/screenshots/colors/matrix.png" width="200"><br><sub>Matrix</sub></td>
   </tr>
 </table>
 

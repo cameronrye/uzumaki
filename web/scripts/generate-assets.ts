@@ -25,8 +25,18 @@ const __dirname = path.dirname(__filename);
 const BASE_URL = 'http://localhost:5173';
 const OUTPUT_DIR = '../../assets/screenshots'; // Repo root assets folder
 const ASSETS_ROOT = '../../assets';
-const VIEWPORT = { width: 1280, height: 720 };
 const SCREENSHOT_DELAY = 1500; // ms to wait for animation to settle
+
+// Viewport configurations for different aspect ratios
+const VIEWPORTS = {
+  landscape: { width: 1920, height: 1080 },
+  standard: { width: 1280, height: 720 },
+  square: { width: 1080, height: 1080 },
+  portrait: { width: 1080, height: 1920 },
+  thumbnail: { width: 640, height: 360 },
+};
+
+const VIEWPORT = VIEWPORTS.standard; // Default viewport
 
 // Spiral-specific optimal configurations for screenshots
 // Each spiral type has parameters tuned for best visual representation
@@ -36,19 +46,21 @@ interface SpiralConfig {
   tight?: string;
   pts?: string;
   step?: string;
+  color?: string;
+  bg?: string;
 }
 
 const SPIRAL_CONFIGS: SpiralConfig[] = [
-  { type: 'archimedean' },
-  { type: 'fibonacci' },
-  { type: 'fermat' },
-  { type: 'logarithmic', pts: '300' },
-  { type: 'hyperbolic', tight: '5' },
-  { type: 'lituus', tight: '4' },
-  { type: 'theodorus', line: 'triangles', pts: '50', tight: '5' },
-  { type: 'vogel', line: 'points', pts: '800', tight: '2' },
-  { type: 'curlicue', pts: '1000', tight: '1' },
-  { type: 'uzumaki', tight: '5', pts: '600' },
+  { type: 'archimedean', color: 'rainbow', bg: 'dark' },
+  { type: 'fibonacci', color: 'aurora', bg: 'gradient' },
+  { type: 'fermat', color: 'sunset', bg: 'dark' },
+  { type: 'logarithmic', pts: '300', color: 'ocean', bg: 'black' },
+  { type: 'hyperbolic', tight: '5', color: 'fire', bg: 'gradient' },
+  { type: 'lituus', tight: '4', color: 'neon', bg: 'dark' },
+  { type: 'theodorus', line: 'triangles', pts: '50', tight: '5', color: 'candy', bg: 'matching' },
+  { type: 'vogel', line: 'points', pts: '800', tight: '2', color: 'sunset', bg: 'black' },
+  { type: 'curlicue', pts: '1000', tight: '1', color: 'matrix', bg: 'dark' },
+  { type: 'uzumaki', tight: '5', pts: '600', color: 'retro', bg: 'gradient' },
 ];
 
 // Color presets to capture
@@ -63,12 +75,46 @@ const LINE_STYLES = ['solid', 'dashed', 'dotted', 'glow'];
 // Background styles to capture
 const BACKGROUND_STYLES = ['dark', 'black', 'gradient', 'matching'];
 
-// Featured presets for hero images
+// Parameter ranges for variation screenshots
+const PARAMETER_RANGES = {
+  tight: ['1', '3', '5', '8', '12'],
+  pts: ['100', '300', '500', '800', '1200'],
+};
+
+// Combination matrix for diverse screenshots
+const COMBO_MATRIX = {
+  spirals: ['fibonacci', 'vogel', 'uzumaki', 'logarithmic', 'fermat', 'archimedean'],
+  colors: ['aurora', 'sunset', 'neon', 'ocean', 'fire', 'rainbow'],
+  lines: ['glow', 'solid', 'dashed', 'dotted'],
+  bgs: ['dark', 'black', 'gradient', 'matching'],
+};
+
+// Featured presets for hero images - expanded for more variety
 const FEATURED_CONFIGS = [
   { name: 'hero', type: 'fibonacci', color: 'aurora', line: 'glow', bg: 'dark' },
   { name: 'sunflower', type: 'vogel', color: 'sunset', line: 'points', bg: 'black', pts: '1000', tight: '2' },
-  { name: 'chaos', type: 'uzumaki', color: 'neon', line: 'glow', bg: 'gradient' },
+  { name: 'chaos', type: 'uzumaki', color: 'neon', line: 'glow', bg: 'gradient', tight: '5', pts: '600' },
+  { name: 'ocean-log', type: 'logarithmic', color: 'ocean', line: 'solid', bg: 'gradient', pts: '400' },
+  { name: 'fire-fermat', type: 'fermat', color: 'fire', line: 'glow', bg: 'black' },
+  { name: 'matrix-curlicue', type: 'curlicue', color: 'matrix', line: 'solid', bg: 'dark', pts: '1200', tight: '1' },
+  { name: 'retro-theodorus', type: 'theodorus', color: 'retro', line: 'triangles', bg: 'matching', pts: '50', tight: '5' },
+  { name: 'candy-lituus', type: 'lituus', color: 'candy', line: 'dashed', bg: 'dark', tight: '3' },
+  { name: 'rainbow-archimedean', type: 'archimedean', color: 'rainbow', line: 'glow', bg: 'gradient' },
+  { name: 'monochrome-hyperbolic', type: 'hyperbolic', color: 'monochrome', line: 'solid', bg: 'black', tight: '6' },
 ];
+
+// Seeded random for reproducible "random" selections
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+// Get a random element from array using seeded random
+function randomChoice<T>(arr: T[], random: () => number): T {
+  return arr[Math.floor(random() * arr.length)];
+}
 
 let devServer: ChildProcess | null = null;
 
@@ -241,9 +287,9 @@ async function generateSpiralScreenshots(browser: Browser): Promise<void> {
   for (const config of SPIRAL_CONFIGS) {
     const params: Record<string, string> = {
       type: config.type,
-      color: 'aurora',
+      color: config.color || 'aurora',
       line: config.line || 'glow',
-      bg: 'dark',
+      bg: config.bg || 'dark',
     };
     // Add optional parameters
     if (config.tight) params.tight = config.tight;
@@ -267,10 +313,19 @@ async function generateColorScreenshots(browser: Browser): Promise<void> {
 
   ensureDir(`${OUTPUT_DIR}/colors`);
 
-  for (const color of COLOR_PRESETS) {
+  // Use different spiral types for each color to show variety
+  const spiralTypes = ['fibonacci', 'logarithmic', 'fermat', 'archimedean', 'vogel',
+                       'uzumaki', 'hyperbolic', 'lituus', 'curlicue', 'theodorus'];
+  const lineStyles = ['glow', 'solid', 'dashed', 'glow', 'points',
+                      'glow', 'solid', 'dashed', 'solid', 'triangles'];
+
+  for (let i = 0; i < COLOR_PRESETS.length; i++) {
+    const color = COLOR_PRESETS[i];
+    const type = spiralTypes[i % spiralTypes.length];
+    const line = lineStyles[i % lineStyles.length];
     await captureScreenshot(
       page,
-      { type: 'fibonacci', color, line: 'solid', bg: 'dark' },
+      { type, color, line, bg: 'dark' },
       path.join(__dirname, OUTPUT_DIR, 'colors', `${color}.png`)
     );
   }
@@ -285,11 +340,19 @@ async function generateStyleScreenshots(browser: Browser): Promise<void> {
 
   ensureDir(`${OUTPUT_DIR}/styles`);
 
-  for (const line of LINE_STYLES) {
+  // Use different spiral types and colors for each line style
+  const styleConfigs = [
+    { line: 'solid', type: 'fibonacci', color: 'sunset' },
+    { line: 'dashed', type: 'logarithmic', color: 'ocean' },
+    { line: 'dotted', type: 'fermat', color: 'candy' },
+    { line: 'glow', type: 'uzumaki', color: 'neon' },
+  ];
+
+  for (const config of styleConfigs) {
     await captureScreenshot(
       page,
-      { type: 'archimedean', color: 'rainbow', line, bg: 'dark' },
-      path.join(__dirname, OUTPUT_DIR, 'styles', `${line}.png`)
+      { type: config.type, color: config.color, line: config.line, bg: 'dark' },
+      path.join(__dirname, OUTPUT_DIR, 'styles', `${config.line}.png`)
     );
   }
 
@@ -303,19 +366,148 @@ async function generateThemeScreenshots(browser: Browser): Promise<void> {
 
   ensureDir(`${OUTPUT_DIR}/themes`);
 
-  for (const bg of BACKGROUND_STYLES) {
+  // Use different spiral/color combos for each theme
+  const themeConfigs = [
+    { bg: 'dark', type: 'fibonacci', color: 'aurora', line: 'glow' },
+    { bg: 'black', type: 'vogel', color: 'fire', line: 'points' },
+    { bg: 'gradient', type: 'uzumaki', color: 'neon', line: 'glow' },
+    { bg: 'matching', type: 'theodorus', color: 'ocean', line: 'triangles' },
+  ];
+
+  for (const config of themeConfigs) {
     await captureScreenshot(
       page,
-      { type: 'fibonacci', color: 'ocean', line: 'glow', bg },
-      path.join(__dirname, OUTPUT_DIR, 'themes', `${bg}.png`)
+      { type: config.type, color: config.color, line: config.line, bg: config.bg },
+      path.join(__dirname, OUTPUT_DIR, 'themes', `${config.bg}.png`)
     );
   }
 
   await page.close();
 }
 
+async function generateParameterVariations(browser: Browser): Promise<void> {
+  console.log('\nGenerating parameter variation screenshots...');
+  const page = await browser.newPage();
+  await page.setViewportSize(VIEWPORT);
+
+  ensureDir(`${OUTPUT_DIR}/variations`);
+
+  // Tightness variations for fibonacci
+  console.log('  Capturing tightness variations...');
+  for (const tight of PARAMETER_RANGES.tight) {
+    await captureScreenshot(
+      page,
+      { type: 'fibonacci', color: 'aurora', line: 'glow', bg: 'dark', tight, pts: '400' },
+      path.join(__dirname, OUTPUT_DIR, 'variations', `fibonacci-tight-${tight}.png`)
+    );
+  }
+
+  // Points variations for vogel
+  console.log('  Capturing point count variations...');
+  for (const pts of PARAMETER_RANGES.pts) {
+    await captureScreenshot(
+      page,
+      { type: 'vogel', color: 'sunset', line: 'points', bg: 'black', pts, tight: '2' },
+      path.join(__dirname, OUTPUT_DIR, 'variations', `vogel-pts-${pts}.png`)
+    );
+  }
+
+  // Curlicue with different point counts
+  console.log('  Capturing curlicue variations...');
+  for (const pts of ['500', '1000', '2000']) {
+    await captureScreenshot(
+      page,
+      { type: 'curlicue', color: 'matrix', line: 'solid', bg: 'dark', pts, tight: '1' },
+      path.join(__dirname, OUTPUT_DIR, 'variations', `curlicue-pts-${pts}.png`)
+    );
+  }
+
+  await page.close();
+}
+
+async function generateComboScreenshots(browser: Browser): Promise<void> {
+  console.log('\nGenerating combination screenshots...');
+  const page = await browser.newPage();
+  await page.setViewportSize(VIEWPORT);
+
+  ensureDir(`${OUTPUT_DIR}/combos`);
+
+  // Use seeded random for reproducible combinations
+  const random = seededRandom(42);
+
+  // Generate diverse combinations
+  let comboIndex = 0;
+  for (const spiral of COMBO_MATRIX.spirals) {
+    // Pick complementary options for each spiral
+    const color = randomChoice(COMBO_MATRIX.colors, random);
+    const line = randomChoice(COMBO_MATRIX.lines, random);
+    const bg = randomChoice(COMBO_MATRIX.bgs, random);
+
+    const params: Record<string, string> = { type: spiral, color, line, bg };
+
+    // Add appropriate parameters based on spiral type
+    if (['vogel', 'curlicue'].includes(spiral)) {
+      params.pts = randomChoice(['500', '800', '1000'], random);
+    }
+    if (['hyperbolic', 'lituus', 'uzumaki'].includes(spiral)) {
+      params.tight = randomChoice(['3', '5', '8'], random);
+    }
+
+    await captureScreenshot(
+      page,
+      params,
+      path.join(__dirname, OUTPUT_DIR, 'combos', `combo-${String(comboIndex).padStart(2, '0')}-${spiral}.png`)
+    );
+    comboIndex++;
+  }
+
+  // Additional curated interesting combinations
+  const curatedCombos = [
+    { type: 'fibonacci', color: 'fire', line: 'glow', bg: 'black' },
+    { type: 'vogel', color: 'aurora', line: 'points', bg: 'gradient', pts: '1200' },
+    { type: 'uzumaki', color: 'candy', line: 'dashed', bg: 'matching', tight: '6' },
+    { type: 'logarithmic', color: 'monochrome', line: 'solid', bg: 'dark', pts: '500' },
+    { type: 'theodorus', color: 'rainbow', line: 'triangles', bg: 'black', pts: '60' },
+    { type: 'fermat', color: 'matrix', line: 'dotted', bg: 'gradient' },
+  ];
+
+  for (const combo of curatedCombos) {
+    const params: Record<string, string> = { ...combo };
+    await captureScreenshot(
+      page,
+      params,
+      path.join(__dirname, OUTPUT_DIR, 'combos', `combo-${String(comboIndex).padStart(2, '0')}-${combo.type}-${combo.color}.png`)
+    );
+    comboIndex++;
+  }
+
+  await page.close();
+}
+
+async function generateViewportVariations(browser: Browser): Promise<void> {
+  console.log('\nGenerating viewport variation screenshots...');
+
+  ensureDir(`${OUTPUT_DIR}/viewports`);
+
+  // Hero config to use for viewport demos
+  const heroParams = { type: 'fibonacci', color: 'aurora', line: 'glow', bg: 'dark' };
+
+  for (const [name, viewport] of Object.entries(VIEWPORTS)) {
+    const page = await browser.newPage();
+    await page.setViewportSize(viewport);
+
+    await captureScreenshot(
+      page,
+      heroParams,
+      path.join(__dirname, OUTPUT_DIR, 'viewports', `${name}-${viewport.width}x${viewport.height}.png`)
+    );
+
+    await page.close();
+  }
+}
+
 async function generateHeroAssets(browser: Browser): Promise<void> {
-  console.log('\nGenerating hero images and demo GIF...');
+  console.log('\nGenerating hero images and demo GIFs...');
   const page = await browser.newPage();
   await page.setViewportSize(VIEWPORT);
 
@@ -323,7 +515,7 @@ async function generateHeroAssets(browser: Browser): Promise<void> {
   const framesDir = path.join(__dirname, OUTPUT_DIR, 'frames');
   ensureDir('../assets/screenshots/frames');
 
-  // Generate hero screenshot
+  // Generate hero screenshots
   for (const config of FEATURED_CONFIGS) {
     const params: Record<string, string> = {
       type: config.type,
@@ -342,25 +534,35 @@ async function generateHeroAssets(browser: Browser): Promise<void> {
     );
   }
 
-  // Generate demo GIF frames using Uzumaki spiral - Chaos preset
-  console.log('\n  Capturing GIF frames (this may take a minute)...');
-  await captureGifFrames(
-    page,
-    { type: 'uzumaki', color: 'rainbow', line: 'dashed', bg: 'gradient', tight: '5', pts: '600', spin: '0.5' },
-    framesDir,
-    80, // 4 seconds at 20fps for more chaotic animation
-    50
-  );
+  // Generate multiple demo GIFs with different spirals
+  const gifConfigs = [
+    { name: 'demo', type: 'uzumaki', color: 'rainbow', line: 'dashed', bg: 'gradient', tight: '5', pts: '600', spin: '0.5' },
+    { name: 'demo-fibonacci', type: 'fibonacci', color: 'aurora', line: 'glow', bg: 'dark', spin: '0.3' },
+    { name: 'demo-vogel', type: 'vogel', color: 'sunset', line: 'points', bg: 'black', pts: '800', tight: '2', spin: '0.2' },
+  ];
 
-  // Create GIF
-  try {
-    await createGif(framesDir, path.join(__dirname, ASSETS_ROOT, 'demo.gif'));
-  } catch (error) {
-    console.warn('  Warning: Could not create GIF. Install gifski or ffmpeg.');
+  for (const gifConfig of gifConfigs) {
+    console.log(`\n  Capturing ${gifConfig.name} GIF frames...`);
+    const { name, ...params } = gifConfig;
+
+    await captureGifFrames(
+      page,
+      params as Record<string, string>,
+      framesDir,
+      80, // 4 seconds at 20fps
+      50
+    );
+
+    // Create GIF
+    try {
+      await createGif(framesDir, path.join(__dirname, ASSETS_ROOT, `${name}.gif`));
+    } catch (error) {
+      console.warn(`  Warning: Could not create ${name}.gif. Install gifski or ffmpeg.`);
+    }
+
+    // Cleanup frames
+    cleanupFrames(framesDir);
   }
-
-  // Cleanup frames
-  cleanupFrames(framesDir);
 
   await page.close();
 }
@@ -373,11 +575,17 @@ async function main(): Promise<void> {
 
     const browser = await chromium.launch({ headless: true });
 
+    // Core screenshots
     await generateHeroAssets(browser);
     await generateSpiralScreenshots(browser);
     await generateColorScreenshots(browser);
     await generateStyleScreenshots(browser);
     await generateThemeScreenshots(browser);
+
+    // Variation screenshots
+    await generateParameterVariations(browser);
+    await generateComboScreenshots(browser);
+    await generateViewportVariations(browser);
 
     await browser.close();
     console.log('\n=== Asset generation complete! ===');

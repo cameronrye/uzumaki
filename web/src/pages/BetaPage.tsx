@@ -1,6 +1,16 @@
 import { PageLayout } from '../components/PageLayout';
 import './BetaPage.css';
 
+// Screenshot gallery for the beta page
+const showcaseImages = [
+  { src: '/screenshots/hero.png', alt: 'Fibonacci Aurora spiral', label: 'Fibonacci Aurora' },
+  { src: '/screenshots/chaos.png', alt: 'Uzumaki Neon spiral', label: 'Uzumaki Neon' },
+  { src: '/screenshots/sunflower.png', alt: 'Vogel Sunflower pattern', label: 'Vogel Sunflower' },
+  { src: '/screenshots/ocean-log.png', alt: 'Logarithmic Ocean spiral', label: 'Logarithmic Ocean' },
+  { src: '/screenshots/fire-fermat.png', alt: 'Fermat Fire spiral', label: 'Fermat Fire' },
+  { src: '/screenshots/matrix-curlicue.png', alt: 'Curlicue Matrix fractal', label: 'Curlicue Matrix' },
+];
+
 export function BetaPage() {
   return (
     <PageLayout title="TestFlight Beta">
@@ -9,6 +19,18 @@ export function BetaPage() {
         <p className="beta-tagline">
           Be among the first to experience new features and help shape the future of Uzumaki.
         </p>
+      </div>
+
+      <div className="page-section">
+        <h2>Preview</h2>
+        <div className="screenshot-gallery">
+          {showcaseImages.map((img, index) => (
+            <div key={index} className="screenshot-item">
+              <img src={img.src} alt={img.alt} loading="lazy" />
+              <span className="screenshot-label">{img.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="page-section">
