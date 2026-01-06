@@ -1,3 +1,4 @@
+#if os(iOS) || os(macOS)
 import SwiftUI
 import UzumakiCore
 
@@ -556,3 +557,4 @@ struct BeatingHeart: View {
             }
     }
 }
+#endif  // os(iOS) || os(macOS)

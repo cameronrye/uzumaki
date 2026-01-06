@@ -1,7 +1,8 @@
+#if os(iOS) || os(macOS)
 import SwiftUI
-import UniformTypeIdentifiers
 import UzumakiCore
-#if canImport(UIKit)
+import UniformTypeIdentifiers
+#if os(iOS)
 import UIKit
 import Photos
 #endif
@@ -242,4 +243,4 @@ struct ExportableCanvas: View {
         .background(viewModel.backgroundColor)
     }
 }
-
+#endif  // os(iOS) || os(macOS)

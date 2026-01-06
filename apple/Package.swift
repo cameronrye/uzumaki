@@ -7,7 +7,8 @@ let package = Package(
     name: "Uzumaki",
     platforms: [
         .iOS(.v17),
-        .macOS(.v14)
+        .macOS(.v14),
+        .watchOS(.v10)
     ],
     products: [
         .library(

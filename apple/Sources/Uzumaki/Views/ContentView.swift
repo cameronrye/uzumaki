@@ -1,3 +1,4 @@
+#if os(iOS) || os(macOS)
 import SwiftUI
 import UzumakiCore
 #if os(iOS)
@@ -742,3 +743,4 @@ public struct ContentView: View {
 #Preview {
     ContentView()
 }
+#endif  // os(iOS) || os(macOS)
