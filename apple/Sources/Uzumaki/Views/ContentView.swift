@@ -221,12 +221,37 @@ public struct ContentView: View {
                 iPadActionButtons
 
                 Spacer(minLength: 20)
+
+                // Footer attribution
+                iPadFooter
             }
             .padding(20)
         }
         .frame(width: 320)
         .background(Color.black.opacity(0.3))
         .background(.ultraThinMaterial)
+    }
+
+    /// Footer with attribution
+    private var iPadFooter: some View {
+        HStack(spacing: 4) {
+            Text("Made with")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.5))
+
+            Image(systemName: "heart.fill")
+                .font(.caption2)
+                .foregroundStyle(BrandColors.gradient)
+
+            Text("by")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.5))
+
+            Link("Cameron Rye", destination: URL(string: "https://rye.dev")!)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .padding(.top, 8)
     }
 
     // MARK: - iPad Side Panel Components
