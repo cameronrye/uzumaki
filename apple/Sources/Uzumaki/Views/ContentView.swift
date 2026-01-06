@@ -467,19 +467,22 @@ public struct ContentView: View {
                     #if os(macOS)
                     // macOS: Use SwiftUI MagnificationGesture (works well with trackpad)
                     .gesture(combinedZoomPanGesture)
-                    #else
-                    // iOS: Only use pan gesture here; pinch is handled by PinchGestureView
-                    .gesture(panGesture)
                     #endif
 
                 #if os(iOS)
-                // iOS: Use UIKit pinch gesture for accurate center point tracking
+                // iOS: Use UIKit gesture recognizers for accurate touch tracking
                 PinchGestureView(
                     onPinchChanged: { deltaScale, center in
                         handlePinchChanged(deltaScale: deltaScale, center: center)
                     },
                     onPinchEnded: {
                         handlePinchEnded()
+                    },
+                    onPanChanged: { translation in
+                        handlePanChanged(translation: translation)
+                    },
+                    onPanEnded: { predictedTranslation in
+                        handlePanEnded(predictedTranslation: predictedTranslation)
                     }
                 )
                 #endif
@@ -721,6 +724,59 @@ public struct ContentView: View {
         pinchCenter = nil
         isGestureActive = false
         syncCurrentPan()
+    }
+
+    /// Handle pan gesture change from PinchGestureView
+    private func handlePanChanged(translation: CGSize) {
+        // On first touch of this gesture, capture the starting state
+        if !isPanGestureActive {
+            // Cancel any ongoing momentum animation
+            cancelMomentumAndSyncState()
+            // Capture pan state at gesture start
+            gestureStartPan = CGSize(width: viewModel.panX, height: viewModel.panY)
+            isPanGestureActive = true
+        }
+
+        isGestureActive = true
+
+        // Scale pan speed by zoom level - move slower when zoomed in for precision
+        let zoomScale = max(1.0, viewModel.zoom)
+        let scaledTranslationX = translation.width / zoomScale
+        let scaledTranslationY = translation.height / zoomScale
+
+        // Calculate new pan from gesture START position (not currentPan which may be stale)
+        let newPanX = gestureStartPan.width + scaledTranslationX
+        let newPanY = gestureStartPan.height + scaledTranslationY
+
+        // Apply dynamic bounds based on zoom level
+        let maxPan = Constants.panLimit / viewModel.zoom
+        viewModel.panX = max(-maxPan, min(maxPan, newPanX))
+        viewModel.panY = max(-maxPan, min(maxPan, newPanY))
+    }
+
+    /// Handle pan gesture end from PinchGestureView
+    private func handlePanEnded(predictedTranslation: CGSize) {
+        let zoomScale = max(1.0, viewModel.zoom)
+        let maxPan = Constants.panLimit / viewModel.zoom
+
+        // Use predicted translation from gesture START position
+        let predictedX = gestureStartPan.width + predictedTranslation.width / zoomScale
+        let predictedY = gestureStartPan.height + predictedTranslation.height / zoomScale
+
+        // Clamp to bounds
+        let finalX = max(-maxPan, min(maxPan, predictedX))
+        let finalY = max(-maxPan, min(maxPan, predictedY))
+
+        // Animate to predicted position with deceleration
+        withAnimation(.easeOut(duration: 0.3)) {
+            viewModel.panX = finalX
+            viewModel.panY = finalY
+        }
+
+        // Update state immediately (not after delay) to prevent jumpy behavior
+        currentPan = CGSize(width: finalX, height: finalY)
+        isPanGestureActive = false
+        isGestureActive = false
     }
     #endif
 

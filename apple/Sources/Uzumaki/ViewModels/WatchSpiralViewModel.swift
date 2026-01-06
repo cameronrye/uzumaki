@@ -83,9 +83,20 @@ public final class WatchSpiralViewModel {
     }
     
     // MARK: - Initialization
-    
-    public init() {}
-    
+
+    public init() {
+        // Initialize with the first preset for consistent state
+        let preset = SpiralPreset.allPresets[0]
+        spiralType = preset.type
+        tightness = preset.tightness
+        spinRate = preset.spinRate
+        stepSize = preset.stepSize
+        numSteps = min(preset.numSteps, 300)
+        colorPreset = preset.colorPreset
+        lineStyle = preset.lineStyle
+        zoom = preset.zoom
+    }
+
     // MARK: - Actions
     
     /// Toggle play/pause
@@ -125,9 +136,46 @@ public final class WatchSpiralViewModel {
         colorPreset = preset.colorPreset
         lineStyle = preset.lineStyle
         zoom = preset.zoom
+        currentPresetIndex = SpiralPreset.allPresets.firstIndex(where: { $0.id == preset.id }) ?? 0
         WKInterfaceDevice.current().play(.success)
     }
-    
+
+    // MARK: - Preset Navigation
+
+    private var currentPresetIndex: Int = 0
+
+    /// Load the next preset (swipe left)
+    public func nextPreset() {
+        let allPresets = SpiralPreset.allPresets
+        currentPresetIndex = (currentPresetIndex + 1) % allPresets.count
+        loadPresetAtCurrentIndex()
+    }
+
+    /// Load the previous preset (swipe right)
+    public func previousPreset() {
+        let allPresets = SpiralPreset.allPresets
+        currentPresetIndex = (currentPresetIndex - 1 + allPresets.count) % allPresets.count
+        loadPresetAtCurrentIndex()
+    }
+
+    private func loadPresetAtCurrentIndex() {
+        let preset = SpiralPreset.allPresets[currentPresetIndex]
+        spiralType = preset.type
+        tightness = preset.tightness
+        spinRate = preset.spinRate
+        stepSize = preset.stepSize
+        numSteps = min(preset.numSteps, 300)
+        colorPreset = preset.colorPreset
+        lineStyle = preset.lineStyle
+        zoom = preset.zoom
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Current preset name for display
+    public var currentPresetName: String {
+        SpiralPreset.allPresets[currentPresetIndex].name
+    }
+
     /// Increment time for animation
     public func incrementTime(delta: Double) {
         guard !isPaused else { return }

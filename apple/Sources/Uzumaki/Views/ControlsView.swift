@@ -225,16 +225,6 @@ public struct ControlsView: View {
 
             Divider()
 
-            // Favorite toggle
-            Button(action: { viewModel.toggleFavorite() }) {
-                Label(
-                    viewModel.isFavorited ? "Remove from Favorites" : "Add to Favorites",
-                    systemImage: viewModel.isFavorited ? "heart.fill" : "heart"
-                )
-            }
-
-            Divider()
-
             // Settings toggles
             Toggle(isOn: $viewModel.lineThicknessVariation) {
                 Label("Variable Line Thickness", systemImage: "line.diagonal")

@@ -81,7 +81,6 @@ public final class SpiralViewModel {
     public var showOnboarding: Bool = true
     public var showShortcuts: Bool = false
     public var toastMessage: String?
-    public var isFavorited: Bool = false
     
     // MARK: - Computed Properties
     
@@ -297,17 +296,6 @@ public final class SpiralViewModel {
     public func dismissToast() {
         withAnimation {
             toastMessage = nil
-        }
-    }
-
-    /// Toggle favorite status
-    public func toggleFavorite() {
-        isFavorited.toggle()
-        triggerImpactFeedback()
-        if isFavorited {
-            showToast("Added to favorites")
-        } else {
-            showToast("Removed from favorites")
         }
     }
 

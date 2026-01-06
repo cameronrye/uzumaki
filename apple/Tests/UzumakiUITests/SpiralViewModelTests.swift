@@ -6,11 +6,30 @@ import SwiftUI
 @Suite("Spiral ViewModel Tests")
 @MainActor
 struct SpiralViewModelTests {
-    
+
+    /// Clear UserDefaults before tests that check initial state
+    private func clearUserDefaults() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: "hasLaunchedBefore")
+        defaults.removeObject(forKey: "spiralType")
+        defaults.removeObject(forKey: "colorPreset")
+        defaults.removeObject(forKey: "lineStyle")
+        defaults.removeObject(forKey: "backgroundTheme")
+        defaults.removeObject(forKey: "performanceMode")
+        defaults.removeObject(forKey: "lineThicknessVariation")
+        defaults.removeObject(forKey: "spinRate")
+        defaults.removeObject(forKey: "tightness")
+        defaults.removeObject(forKey: "stepSize")
+        defaults.removeObject(forKey: "numSteps")
+    }
+
     @Test("Initial state is correct")
     func testInitialState() {
+        // Clear any saved settings so we get true defaults
+        clearUserDefaults()
+
         let viewModel = SpiralViewModel()
-        
+
         #expect(viewModel.spiralType == .archimedean)
         #expect(viewModel.isPaused == false)
         #expect(viewModel.time == 0)
