@@ -30,10 +30,14 @@ public struct ContentView: View {
 
     // Enhanced gesture tracking
     @State private var lastMagnification: CGFloat = 1.0
-    @State private var gestureLocation: CGPoint = .zero
     @State private var canvasSize: CGSize = .zero
     @State private var hitZoomBoundary: Bool = false
     @State private var isGestureActive: Bool = false
+
+    // Gesture start state tracking - captured at gesture begin to prevent drift
+    @State private var gestureStartPan: CGSize = .zero
+    @State private var isPanGestureActive: Bool = false
+    @State private var pinchCenter: CGPoint? = nil
 
     // Pre-prepared haptic generators for lower latency (iOS only)
     #if os(iOS)
@@ -457,22 +461,42 @@ public struct ContentView: View {
     /// The spiral canvas with gestures
     private var spiralCanvas: some View {
         GeometryReader { geometry in
-            SpiralCanvasView(viewModel: viewModel)
-                .gesture(doubleTapGesture)
-                .gesture(combinedZoomPanGesture)
-                .onAppear {
-                    canvasSize = geometry.size
-                    viewModel.updateViewportScale(for: geometry.size)
-                    // Pre-prepare haptic generators for lower latency
-                    #if os(iOS)
-                    lightImpactGenerator.prepare()
-                    mediumImpactGenerator.prepare()
+            ZStack {
+                SpiralCanvasView(viewModel: viewModel)
+                    .gesture(doubleTapGesture)
+                    #if os(macOS)
+                    // macOS: Use SwiftUI MagnificationGesture (works well with trackpad)
+                    .gesture(combinedZoomPanGesture)
+                    #else
+                    // iOS: Only use pan gesture here; pinch is handled by PinchGestureView
+                    .gesture(panGesture)
                     #endif
-                }
-                .onChange(of: geometry.size) { _, newSize in
-                    canvasSize = newSize
-                    viewModel.updateViewportScale(for: newSize)
-                }
+
+                #if os(iOS)
+                // iOS: Use UIKit pinch gesture for accurate center point tracking
+                PinchGestureView(
+                    onPinchChanged: { deltaScale, center in
+                        handlePinchChanged(deltaScale: deltaScale, center: center)
+                    },
+                    onPinchEnded: {
+                        handlePinchEnded()
+                    }
+                )
+                #endif
+            }
+            .onAppear {
+                canvasSize = geometry.size
+                viewModel.updateViewportScale(for: geometry.size)
+                // Pre-prepare haptic generators for lower latency
+                #if os(iOS)
+                lightImpactGenerator.prepare()
+                mediumImpactGenerator.prepare()
+                #endif
+            }
+            .onChange(of: geometry.size) { _, newSize in
+                canvasSize = newSize
+                viewModel.updateViewportScale(for: newSize)
+            }
         }
         .ignoresSafeArea()
     }
@@ -557,15 +581,17 @@ public struct ContentView: View {
             }
     }
 
-    /// Combined zoom and pan gesture for simultaneous recognition
+    /// Combined zoom and pan gesture for simultaneous recognition (macOS only)
     private var combinedZoomPanGesture: some Gesture {
         SimultaneousGesture(zoomGesture, panGesture)
     }
 
-    /// Enhanced zoom gesture with anchor point and haptic feedback
+    /// Zoom gesture for macOS trackpad (uses canvas center as anchor point)
     private var zoomGesture: some Gesture {
         MagnificationGesture()
             .onChanged { scale in
+                // Cancel any ongoing momentum animation by snapping state
+                cancelMomentumAndSyncState()
                 isGestureActive = true
 
                 // Calculate zoom delta from last magnification value
@@ -573,35 +599,8 @@ public struct ContentView: View {
                 let proposedZoom = viewModel.zoom * delta
                 let clampedZoom = max(Constants.zoomMin, min(Constants.zoomMax, proposedZoom))
 
-                // Haptic feedback when hitting zoom boundaries
-                #if os(iOS)
-                if proposedZoom != clampedZoom && !hitZoomBoundary {
-                    lightImpactGenerator.impactOccurred()
-                    hitZoomBoundary = true
-                } else if proposedZoom == clampedZoom {
-                    hitZoomBoundary = false
-                }
-                #endif
-
-                // Anchor zoom to gesture center point (pinch location)
-                // This keeps the point under the user's fingers stable during zoom
-                if gestureLocation != .zero && canvasSize != .zero {
-                    let centerX = canvasSize.width / 2
-                    let centerY = canvasSize.height / 2
-
-                    // Calculate offset from center to gesture point
-                    let offsetX = gestureLocation.x - centerX
-                    let offsetY = gestureLocation.y - centerY
-
-                    // Adjust pan to compensate for zoom change around gesture point
-                    let zoomRatio = clampedZoom / viewModel.zoom
-                    let panAdjustX = offsetX * (1 - zoomRatio)
-                    let panAdjustY = offsetY * (1 - zoomRatio)
-
-                    viewModel.panX += panAdjustX
-                    viewModel.panY += panAdjustY
-                }
-
+                // For macOS trackpad, zoom around canvas center (no pinch center available)
+                // This provides consistent, predictable behavior
                 viewModel.zoom = clampedZoom
                 lastMagnification = scale
             }
@@ -610,26 +609,33 @@ public struct ContentView: View {
                 lastMagnification = 1.0
                 hitZoomBoundary = false
                 isGestureActive = false
-                currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
+                syncCurrentPan()
             }
     }
 
-    /// Enhanced pan gesture with minimum distance, zoom-scaled speed, momentum, and dynamic bounds
+    /// Enhanced pan gesture with gesture-start tracking to prevent jumpy behavior
     private var panGesture: some Gesture {
         DragGesture(minimumDistance: 5) // Prevent accidental pan on tap
             .onChanged { value in
-                isGestureActive = true
+                // On first touch of this gesture, capture the starting state
+                if !isPanGestureActive {
+                    // Cancel any ongoing momentum animation
+                    cancelMomentumAndSyncState()
+                    // Capture pan state at gesture start
+                    gestureStartPan = CGSize(width: viewModel.panX, height: viewModel.panY)
+                    isPanGestureActive = true
+                }
 
-                // Update gesture location for zoom anchoring
-                gestureLocation = value.location
+                isGestureActive = true
 
                 // Scale pan speed by zoom level - move slower when zoomed in for precision
                 let zoomScale = max(1.0, viewModel.zoom)
                 let scaledTranslationX = value.translation.width / zoomScale
                 let scaledTranslationY = value.translation.height / zoomScale
 
-                let newPanX = currentPan.width + scaledTranslationX
-                let newPanY = currentPan.height + scaledTranslationY
+                // Calculate new pan from gesture START position (not currentPan which may be stale)
+                let newPanX = gestureStartPan.width + scaledTranslationX
+                let newPanY = gestureStartPan.height + scaledTranslationY
 
                 // Apply dynamic bounds based on zoom level
                 let maxPan = Constants.panLimit / viewModel.zoom
@@ -641,9 +647,9 @@ public struct ContentView: View {
                 let zoomScale = max(1.0, viewModel.zoom)
                 let maxPan = Constants.panLimit / viewModel.zoom
 
-                // Use predicted translation for natural momentum/inertia
-                let predictedX = currentPan.width + value.predictedEndTranslation.width / zoomScale
-                let predictedY = currentPan.height + value.predictedEndTranslation.height / zoomScale
+                // Use predicted translation from gesture START position
+                let predictedX = gestureStartPan.width + value.predictedEndTranslation.width / zoomScale
+                let predictedY = gestureStartPan.height + value.predictedEndTranslation.height / zoomScale
 
                 // Clamp to bounds
                 let finalX = max(-maxPan, min(maxPan, predictedX))
@@ -655,13 +661,82 @@ public struct ContentView: View {
                     viewModel.panY = finalY
                 }
 
-                // Update current pan after a short delay to match animation
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
-                }
-
+                // Update state immediately (not after delay) to prevent jumpy behavior
+                currentPan = CGSize(width: finalX, height: finalY)
+                isPanGestureActive = false
                 isGestureActive = false
             }
+    }
+
+    // MARK: - iOS Pinch Gesture Handlers
+
+    #if os(iOS)
+    /// Handle pinch gesture change from PinchGestureView
+    private func handlePinchChanged(deltaScale: CGFloat, center: CGPoint) {
+        // Cancel any ongoing momentum animation on first pinch
+        if pinchCenter == nil {
+            cancelMomentumAndSyncState()
+            pinchCenter = center
+        }
+
+        isGestureActive = true
+
+        let proposedZoom = viewModel.zoom * deltaScale
+        let clampedZoom = max(Constants.zoomMin, min(Constants.zoomMax, proposedZoom))
+
+        // Haptic feedback when hitting zoom boundaries
+        if proposedZoom != clampedZoom && !hitZoomBoundary {
+            lightImpactGenerator.impactOccurred()
+            hitZoomBoundary = true
+        } else if proposedZoom == clampedZoom {
+            hitZoomBoundary = false
+        }
+
+        // Anchor zoom to the initial pinch center point
+        // This keeps the point under the user's fingers stable during zoom
+        if let anchorPoint = pinchCenter, canvasSize != .zero {
+            let centerX = canvasSize.width / 2
+            let centerY = canvasSize.height / 2
+
+            // Calculate offset from canvas center to pinch point
+            let offsetX = anchorPoint.x - centerX
+            let offsetY = anchorPoint.y - centerY
+
+            // Adjust pan to compensate for zoom change around pinch point
+            let zoomRatio = clampedZoom / viewModel.zoom
+            let panAdjustX = offsetX * (1 - zoomRatio)
+            let panAdjustY = offsetY * (1 - zoomRatio)
+
+            viewModel.panX += panAdjustX
+            viewModel.panY += panAdjustY
+        }
+
+        viewModel.zoom = clampedZoom
+    }
+
+    /// Handle pinch gesture end from PinchGestureView
+    private func handlePinchEnded() {
+        currentZoom = viewModel.zoom
+        hitZoomBoundary = false
+        pinchCenter = nil
+        isGestureActive = false
+        syncCurrentPan()
+    }
+    #endif
+
+    // MARK: - Gesture State Helpers
+
+    /// Cancel any ongoing momentum animation and sync state
+    private func cancelMomentumAndSyncState() {
+        // Reading and immediately writing the same value cancels any ongoing animation
+        viewModel.panX = viewModel.panX
+        viewModel.panY = viewModel.panY
+        syncCurrentPan()
+    }
+
+    /// Sync currentPan with viewModel values
+    private func syncCurrentPan() {
+        currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
     }
 
     // MARK: - Actions
@@ -673,8 +748,11 @@ public struct ContentView: View {
             viewModel.panY = 0
             currentZoom = viewModel.zoom
             currentPan = .zero
-            gestureLocation = .zero
         }
+        // Reset gesture tracking state
+        gestureStartPan = .zero
+        isPanGestureActive = false
+        pinchCenter = nil
         #if os(iOS)
         // Haptic feedback using pre-prepared generator for lower latency
         mediumImpactGenerator.impactOccurred()
