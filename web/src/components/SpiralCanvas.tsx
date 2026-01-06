@@ -10,6 +10,11 @@ import {
   getLineDashPattern,
   RenderContext,
 } from '../utils/canvasRenderers';
+import {
+  createSpiralGradient,
+  configureLineContext,
+  calculateCenter,
+} from '../utils/gradientUtils';
 
 // ============================================================================
 
@@ -34,7 +39,9 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
 
   // Memoize color preset lookup
   const colorPresetData = useMemo(() => {
-    return COLOR_PRESETS.find(p => p.id === params.colorPreset) || COLOR_PRESETS[0];
+    const found = COLOR_PRESETS.find(p => p.id === params.colorPreset);
+    const fallback = COLOR_PRESETS[0];
+    return found ?? fallback ?? { id: 'rainbow' as const, name: 'Rainbow', colors: ['#ffffff'] };
   }, [params.colorPreset]);
 
   // Initialize spiral worker with OffscreenCanvas support
@@ -163,8 +170,7 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const centerX = rect.width / 2 + currentPanX;
-    const centerY = rect.height / 2 + currentPanY;
+    const { centerX, centerY } = calculateCenter(rect.width, rect.height, currentPanX, currentPanY);
 
     ctx.clearRect(0, 0, rect.width, rect.height);
 
@@ -173,17 +179,17 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
 
     const colors = colorPresetData.colors;
 
-    const gradientSize = Math.min(rect.width, rect.height) * 0.4;
-    const gradient = ctx.createLinearGradient(
-      centerX - gradientSize, centerY - gradientSize,
-      centerX + gradientSize, centerY + gradientSize
-    );
-    colors.forEach((color, i) => {
-      gradient.addColorStop(i / (colors.length - 1), color);
+    // Create gradient using shared utility
+    const gradient = createSpiralGradient(ctx, {
+      centerX,
+      centerY,
+      width: rect.width,
+      height: rect.height,
+      colors,
     });
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Configure line context using shared utility
+    configureLineContext(ctx);
 
     const lineStyle = params.lineStyle || 'solid';
     ctx.setLineDash(getLineDashPattern(lineStyle) as number[]);
@@ -250,17 +256,21 @@ export function SpiralCanvas({ params, onZoomChange, onPanChange }: SpiralCanvas
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
-      setIsDragging(true);
-      setDragStart({ x: touch.clientX - currentPanX, y: touch.clientY - currentPanY });
+      if (touch) {
+        setIsDragging(true);
+        setDragStart({ x: touch.clientX - currentPanX, y: touch.clientY - currentPanY });
+      }
     }
   }, [currentPanX, currentPanY]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDragging || e.touches.length !== 1) return;
     const touch = e.touches[0];
-    const newPanX = touch.clientX - dragStart.x;
-    const newPanY = touch.clientY - dragStart.y;
-    onPanChange?.(newPanX, newPanY);
+    if (touch) {
+      const newPanX = touch.clientX - dragStart.x;
+      const newPanY = touch.clientY - dragStart.y;
+      onPanChange?.(newPanX, newPanY);
+    }
   }, [isDragging, dragStart, onPanChange]);
 
   const handleTouchEnd = useCallback(() => {

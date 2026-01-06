@@ -35,8 +35,8 @@ export interface PointAccessor {
 export function fromPointArray(points: SpiralPoint[]): PointAccessor {
   return {
     length: points.length,
-    getX: (i: number) => points[i].x,
-    getY: (i: number) => points[i].y,
+    getX: (i: number) => points[i]?.x ?? 0,
+    getY: (i: number) => points[i]?.y ?? 0,
   };
 }
 
@@ -82,7 +82,7 @@ export function drawTriangles<T extends AnyCanvasContext>(context: RenderContext
   for (let i = 1; i < points.length; i++) {
     const progress = i / points.length;
     const colorIndex = Math.floor(progress * (colors.length - 1));
-    ctx.strokeStyle = colors[colorIndex];
+    ctx.strokeStyle = colors[colorIndex] ?? colors[0] ?? '#ffffff';
 
     // Draw triangle: center -> previous point -> current point -> center
     ctx.beginPath();
@@ -96,7 +96,7 @@ export function drawTriangles<T extends AnyCanvasContext>(context: RenderContext
   }
 
   // Draw hypotenuse markers (the outer edge)
-  ctx.strokeStyle = colors[0];
+  ctx.strokeStyle = colors[0] ?? '#ffffff';
   ctx.lineWidth = LINE_WIDTH_TRIANGLES_OUTER;
   ctx.beginPath();
   if (points.length > 1) {
@@ -122,9 +122,9 @@ export function drawPoints<T extends AnyCanvasContext>(context: RenderContext<T>
     const colorProgress = (progress * (colors.length - 1)) % 1;
 
     // Interpolate between colors for smooth gradient
-    ctx.fillStyle = colors[colorIndex];
+    ctx.fillStyle = colors[colorIndex] ?? '#ffffff';
     if (colorProgress > 0 && colorIndex !== nextColorIndex) {
-      ctx.fillStyle = colors[nextColorIndex];
+      ctx.fillStyle = colors[nextColorIndex] ?? '#ffffff';
     }
 
     ctx.beginPath();
@@ -143,7 +143,7 @@ export function drawPointsBatched<T extends AnyCanvasContext>(context: RenderCon
   const pointsPerColor = Math.ceil(points.length / numColors);
 
   for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
-    ctx.fillStyle = colors[colorIdx];
+    ctx.fillStyle = colors[colorIdx] ?? '#ffffff';
     ctx.beginPath();
 
     const startIdx = colorIdx * pointsPerColor;
@@ -176,7 +176,7 @@ export function drawTrianglesBatched<T extends AnyCanvasContext>(context: Render
 
   // Batch triangles by color
   for (let colorIdx = 0; colorIdx < numColors; colorIdx++) {
-    ctx.strokeStyle = colors[colorIdx];
+    ctx.strokeStyle = colors[colorIdx] ?? '#ffffff';
     ctx.beginPath();
 
     const startIdx = colorIdx * trianglesPerColor + 1;
@@ -195,7 +195,7 @@ export function drawTrianglesBatched<T extends AnyCanvasContext>(context: Render
   }
 
   // Draw outer edge
-  ctx.strokeStyle = colors[0];
+  ctx.strokeStyle = colors[0] ?? '#ffffff';
   ctx.lineWidth = LINE_WIDTH_TRIANGLES_OUTER;
   ctx.beginPath();
   if (points.length > 1) {
@@ -211,7 +211,7 @@ export function drawTrianglesBatched<T extends AnyCanvasContext>(context: Render
 export function drawGlow<T extends AnyCanvasContext>(context: RenderContext<T>, isGlowOnly: boolean): void {
   const { ctx, centerX, centerY, points, colors, isPerformanceMode } = context;
 
-  const glowColor = colors[2] || colors[0];
+  const glowColor = colors[2] ?? colors[0] ?? '#ffffff';
   const glowLayers = isPerformanceMode ? GLOW_LAYERS_PERFORMANCE : GLOW_LAYERS_NORMAL;
 
   for (const layer of glowLayers) {

@@ -37,14 +37,14 @@ export function setPoint(
  * Get x coordinate at index
  */
 export function getX(points: TypedSpiralPoints, index: number): number {
-  return points.data[index * 2];
+  return points.data[index * 2] ?? 0;
 }
 
 /**
  * Get y coordinate at index
  */
 export function getY(points: TypedSpiralPoints, index: number): number {
-  return points.data[index * 2 + 1];
+  return points.data[index * 2 + 1] ?? 0;
 }
 
 /**
@@ -55,7 +55,10 @@ export function toTypedPoints(
 ): TypedSpiralPoints {
   const typed = createTypedPoints(points.length);
   for (let i = 0; i < points.length; i++) {
-    setPoint(typed, i, points[i].x, points[i].y);
+    const point = points[i];
+    if (point) {
+      setPoint(typed, i, point.x, point.y);
+    }
   }
   return typed;
 }
@@ -86,8 +89,10 @@ export function applyTransformationsTyped(
 
   const data = points.data;
   for (let i = 0; i < data.length; i += 2) {
-    data[i] = data[i] * zoom + panX;
-    data[i + 1] = data[i + 1] * zoom + panY;
+    const x = data[i];
+    const y = data[i + 1];
+    if (x !== undefined) data[i] = x * zoom + panX;
+    if (y !== undefined) data[i + 1] = y * zoom + panY;
   }
 }
 

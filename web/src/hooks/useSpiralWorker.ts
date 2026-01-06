@@ -1,6 +1,7 @@
 /**
  * Hook for managing spiral generation Web Worker with OffscreenCanvas support.
  * Provides automatic fallback for browsers without OffscreenCanvas support.
+ * Includes retry mechanism and error recovery.
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
@@ -8,11 +9,18 @@ import { SpiralParams } from '../utils/spirals';
 import { supportsOffscreenCanvas } from '../utils/spiralTypedArrays';
 import type { WorkerMessage, WorkerResponse } from '../workers/spiralWorker';
 
+/** Maximum number of retry attempts for worker creation */
+const MAX_RETRY_ATTEMPTS = 3;
+/** Delay between retry attempts in milliseconds */
+const RETRY_DELAY_MS = 1000;
+
 export interface UseSpiralWorkerOptions {
   /** Enable OffscreenCanvas rendering (worker handles all rendering) */
   useOffscreenCanvas?: boolean;
   /** Callback when worker completes a render (OffscreenCanvas mode) */
   onRenderComplete?: () => void;
+  /** Callback when worker encounters an error (for user notification) */
+  onError?: (message: string) => void;
 }
 
 export interface UseSpiralWorkerResult {
@@ -32,6 +40,10 @@ export interface UseSpiralWorkerResult {
   isCanvasTransferred: boolean;
   /** Synchronous check if canvas has been transferred (for use before state updates) */
   checkCanvasTransferred: () => boolean;
+  /** Whether the worker has failed and fallen back to main thread */
+  hasFallback: boolean;
+  /** Number of retry attempts made */
+  retryCount: number;
 }
 
 /**
@@ -40,32 +52,38 @@ export interface UseSpiralWorkerResult {
 export function useSpiralWorker(
   options: UseSpiralWorkerOptions = {}
 ): UseSpiralWorkerResult {
-  const { useOffscreenCanvas = true, onRenderComplete } = options;
+  const { useOffscreenCanvas = true, onRenderComplete, onError } = options;
 
   const workerRef = useRef<Worker | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isWorkerCreated, setIsWorkerCreated] = useState(false);
   const [isOffscreenMode, setIsOffscreenMode] = useState(false);
   const [isCanvasTransferred, setIsCanvasTransferred] = useState(false);
+  const [hasFallback, setHasFallback] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   // Sync ref to track transfer immediately (state updates are async)
   const isCanvasTransferredRef = useRef(false);
   const pendingRenderRef = useRef<{ params: SpiralParams; width: number; height: number } | null>(null);
   const isRenderingRef = useRef(false);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const onErrorRef = useRef(onError);
+
+  // Keep onError ref updated
+  onErrorRef.current = onError;
 
   // Check browser support
   const isSupported = typeof Worker !== 'undefined';
   const canUseOffscreen = useOffscreenCanvas && supportsOffscreenCanvas();
 
-  // Initialize worker
-  useEffect(() => {
-    if (!isSupported) return;
-
+  // Create worker with retry logic
+  const createWorker = useCallback((attempt: number = 0): boolean => {
     try {
       workerRef.current = new Worker(
         new URL('../workers/spiralWorker.ts', import.meta.url),
         { type: 'module' }
       );
       setIsWorkerCreated(true);
+      setRetryCount(attempt);
 
       workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const { type } = e.data;
@@ -96,22 +114,67 @@ export function useSpiralWorker(
       };
 
       workerRef.current.onerror = (error) => {
-        console.warn('Spiral worker error, falling back to main thread:', error);
-        setIsReady(false);
-        setIsWorkerCreated(false);
-        setIsOffscreenMode(false);
+        console.warn(`Spiral worker error (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS}):`, error);
+
+        // Terminate the failed worker
+        workerRef.current?.terminate();
+        workerRef.current = null;
+
+        // Attempt retry if under limit and canvas not yet transferred
+        if (attempt < MAX_RETRY_ATTEMPTS - 1 && !isCanvasTransferredRef.current) {
+          setRetryCount(attempt + 1);
+          retryTimeoutRef.current = window.setTimeout(() => {
+            createWorker(attempt + 1);
+          }, RETRY_DELAY_MS);
+        } else {
+          // Max retries reached, fall back to main thread
+          setIsReady(false);
+          setIsWorkerCreated(false);
+          setIsOffscreenMode(false);
+          setHasFallback(true);
+
+          // Notify user via callback
+          onErrorRef.current?.('Rendering switched to main thread for better compatibility');
+        }
       };
 
+      return true;
     } catch (error) {
-      console.warn('Failed to create spiral worker:', error);
-      setIsWorkerCreated(false);
+      console.warn(`Failed to create spiral worker (attempt ${attempt + 1}):`, error);
+
+      if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+        setRetryCount(attempt + 1);
+        retryTimeoutRef.current = window.setTimeout(() => {
+          createWorker(attempt + 1);
+        }, RETRY_DELAY_MS);
+      } else {
+        setIsWorkerCreated(false);
+        setHasFallback(true);
+        onErrorRef.current?.('Using fallback rendering mode');
+      }
+      return false;
+    }
+  }, [onRenderComplete]);
+
+  // Initialize worker
+  useEffect(() => {
+    if (!isSupported) {
+      setHasFallback(true);
+      return;
     }
 
+    createWorker(0);
+
     return () => {
+      // Clean up retry timeout
+      if (retryTimeoutRef.current !== null) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
       workerRef.current?.terminate();
       workerRef.current = null;
     };
-  }, [isSupported, onRenderComplete]);
+  }, [isSupported, createWorker]);
 
   // Internal render request (doesn't check pending)
   const requestRenderInternal = useCallback((
@@ -184,6 +247,8 @@ export function useSpiralWorker(
     isSupported,
     isCanvasTransferred,
     checkCanvasTransferred,
+    hasFallback,
+    retryCount,
   };
 }
 

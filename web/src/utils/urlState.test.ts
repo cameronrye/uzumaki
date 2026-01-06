@@ -98,10 +98,11 @@ describe('decodeStateFromURL', () => {
   });
 
   it('should decode valid numeric values', () => {
-    window.location.search = '?spin=2.5&tight=20&step=0.1&pts=1000';
+    // Use values within the aligned UI limits (spinRate max=2, tightness max=10, etc.)
+    window.location.search = '?spin=1.5&tight=5&step=0.1&pts=1000';
     const result = decodeStateFromURL();
-    expect(result?.spinRate).toBe(2.5);
-    expect(result?.tightness).toBe(20);
+    expect(result?.spinRate).toBe(1.5);
+    expect(result?.tightness).toBe(5);
     expect(result?.stepSize).toBe(0.1);
     expect(result?.numSteps).toBe(1000);
   });
@@ -178,6 +179,78 @@ describe('decodeStateFromURL', () => {
     const result = decodeStateFromURL();
     expect(result?.performanceMode).toBe(false);
     expect(result?.lineThicknessVariation).toBe(false);
+  });
+
+  it('should decode valid zoom value', () => {
+    window.location.search = '?zoom=2.5';
+    const result = decodeStateFromURL();
+    expect(result?.zoom).toBe(2.5);
+  });
+
+  it('should ignore out-of-range zoom (too low)', () => {
+    window.location.search = '?zoom=0.01';
+    const result = decodeStateFromURL();
+    expect(result?.zoom).toBeUndefined();
+  });
+
+  it('should ignore out-of-range zoom (too high)', () => {
+    window.location.search = '?zoom=100';
+    const result = decodeStateFromURL();
+    expect(result?.zoom).toBeUndefined();
+  });
+
+  it('should decode valid pan values', () => {
+    window.location.search = '?panX=500&panY=-300';
+    const result = decodeStateFromURL();
+    expect(result?.panX).toBe(500);
+    expect(result?.panY).toBe(-300);
+  });
+
+  it('should ignore out-of-range pan values', () => {
+    window.location.search = '?panX=20000&panY=-20000';
+    const result = decodeStateFromURL();
+    expect(result?.panX).toBeUndefined();
+    expect(result?.panY).toBeUndefined();
+  });
+
+  it('should handle NaN values gracefully', () => {
+    window.location.search = '?spin=abc&tight=xyz&pts=notanumber';
+    const result = decodeStateFromURL();
+    expect(result?.spinRate).toBeUndefined();
+    expect(result?.tightness).toBeUndefined();
+    expect(result?.numSteps).toBeUndefined();
+  });
+
+  it('should handle negative numSteps as invalid', () => {
+    window.location.search = '?pts=-100';
+    const result = decodeStateFromURL();
+    expect(result?.numSteps).toBeUndefined();
+  });
+
+  it('should handle floating point numSteps', () => {
+    window.location.search = '?pts=500.7';
+    const result = decodeStateFromURL();
+    // parseInt should parse 500 from "500.7"
+    expect(result?.numSteps).toBe(500);
+  });
+
+  it('should decode complete state correctly', () => {
+    window.location.search = '?type=fibonacci&spin=1.5&tight=5&step=0.1&pts=750&color=sunset&line=dashed&bg=dark&perf=1&thick=1&zoom=2&panX=100&panY=-50';
+    const result = decodeStateFromURL();
+
+    expect(result?.spiralType).toBe('fibonacci');
+    expect(result?.spinRate).toBe(1.5);
+    expect(result?.tightness).toBe(5);
+    expect(result?.stepSize).toBe(0.1);
+    expect(result?.numSteps).toBe(750);
+    expect(result?.colorPreset).toBe('sunset');
+    expect(result?.lineStyle).toBe('dashed');
+    expect(result?.backgroundStyle).toBe('dark');
+    expect(result?.performanceMode).toBe(true);
+    expect(result?.lineThicknessVariation).toBe(true);
+    expect(result?.zoom).toBe(2);
+    expect(result?.panX).toBe(100);
+    expect(result?.panY).toBe(-50);
   });
 });
 

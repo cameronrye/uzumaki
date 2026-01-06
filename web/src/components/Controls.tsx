@@ -142,23 +142,27 @@ export function Controls({
     };
   }, [showTypeSelector, showColors, showLineStyles, showBackgrounds, showPresets]);
 
-  // Fix #8: Memoize lookups
-  const currentTypeInfo = useMemo(() =>
-    SPIRAL_TYPES.find(t => t.type === spiralType) || SPIRAL_TYPES[0],
-    [spiralType]
-  );
-  const currentColorInfo = useMemo(() =>
-    COLOR_PRESETS.find(c => c.id === colorPreset) || COLOR_PRESETS[0],
-    [colorPreset]
-  );
-  const currentLineStyleInfo = useMemo(() =>
-    LINE_STYLES.find(l => l.id === lineStyle) || LINE_STYLES[0],
-    [lineStyle]
-  );
-  const currentBackgroundInfo = useMemo(() =>
-    BACKGROUND_STYLES.find(b => b.id === backgroundStyle) || BACKGROUND_STYLES[0],
-    [backgroundStyle]
-  );
+  // Fix #8: Memoize lookups (with fallback to first item, guaranteed to exist)
+  const currentTypeInfo = useMemo(() => {
+    const found = SPIRAL_TYPES.find(t => t.type === spiralType);
+    const fallback = SPIRAL_TYPES[0];
+    return found ?? fallback ?? { type: 'archimedean' as const, name: 'Archimedean', description: '' };
+  }, [spiralType]);
+  const currentColorInfo = useMemo(() => {
+    const found = COLOR_PRESETS.find(c => c.id === colorPreset);
+    const fallback = COLOR_PRESETS[0];
+    return found ?? fallback ?? { id: 'rainbow' as const, name: 'Rainbow', colors: ['#ffffff'] };
+  }, [colorPreset]);
+  const currentLineStyleInfo = useMemo(() => {
+    const found = LINE_STYLES.find(l => l.id === lineStyle);
+    const fallback = LINE_STYLES[0];
+    return found ?? fallback ?? { id: 'solid' as const, name: 'Solid' };
+  }, [lineStyle]);
+  const currentBackgroundInfo = useMemo(() => {
+    const found = BACKGROUND_STYLES.find(b => b.id === backgroundStyle);
+    const fallback = BACKGROUND_STYLES[0];
+    return found ?? fallback ?? { id: 'dark' as const, name: 'Dark', color: '#000000' };
+  }, [backgroundStyle]);
 
   const handleTypeSelect = useCallback((type: SpiralType) => {
     onTypeChange(type);

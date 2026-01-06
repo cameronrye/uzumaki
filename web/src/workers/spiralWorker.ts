@@ -13,6 +13,11 @@ import {
   getLineDashPattern,
   RenderContext,
 } from '../utils/canvasRenderers';
+import {
+  createSpiralGradient,
+  configureLineContext,
+  calculateCenter,
+} from '../utils/gradientUtils';
 
 // Message types for worker communication
 export interface WorkerMessage {
@@ -52,8 +57,7 @@ function renderToCanvas(
   if (!offscreenCtx || !offscreenCanvas) return;
 
   const ctx = offscreenCtx;
-  const centerX = width / 2 + (params.panX ?? 0);
-  const centerY = height / 2 + (params.panY ?? 0);
+  const { centerX, centerY } = calculateCenter(width, height, params.panX, params.panY);
 
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
@@ -61,21 +65,20 @@ function renderToCanvas(
   if (points.length < 2) return;
 
   // Get colors from preset
-  const colorPreset = COLOR_PRESETS.find(p => p.id === params.colorPreset) || COLOR_PRESETS[0];
-  const colors = colorPreset.colors;
+  const colorPreset = COLOR_PRESETS.find(p => p.id === params.colorPreset) ?? COLOR_PRESETS[0];
+  const colors = colorPreset?.colors ?? ['#ffffff'];
 
-  // Create gradient
-  const gradientSize = Math.min(width, height) * 0.4;
-  const gradient = ctx.createLinearGradient(
-    centerX - gradientSize, centerY - gradientSize,
-    centerX + gradientSize, centerY + gradientSize
-  );
-  colors.forEach((color, i) => {
-    gradient.addColorStop(i / (colors.length - 1), color);
+  // Create gradient using shared utility
+  const gradient = createSpiralGradient(ctx, {
+    centerX,
+    centerY,
+    width,
+    height,
+    colors,
   });
 
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  // Configure line context using shared utility
+  configureLineContext(ctx);
 
   const lineStyle = params.lineStyle || 'solid';
   ctx.setLineDash(getLineDashPattern(lineStyle) as number[]);

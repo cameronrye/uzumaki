@@ -2,28 +2,44 @@ import Foundation
 import simd
 
 /// Pure functions for generating spiral points from parameters
+///
+/// All generation functions follow the algorithms specified in docs/SPIRAL_ALGORITHMS.md
+/// Both platforms (Swift and TypeScript) must maintain parity with this specification.
 public enum SpiralGenerator {
-    
+
     // MARK: - Public API
-    
+
     /// Generate spiral points for the given parameters
+    /// - Parameter params: The spiral parameters including type, steps, and transformations
+    /// - Returns: Generated spiral points with transformations applied
+    /// - Note: Returns empty SpiralPoints when numSteps <= 0
     public static func generate(params: SpiralParams) -> SpiralPoints {
         let numSteps = params.effectiveNumSteps
+
+        // Edge case: Return empty points for invalid step count
+        guard numSteps > 0 else {
+            return SpiralPoints(capacity: 0)
+        }
+
         var points = generateRawPoints(params: params, numSteps: numSteps)
-        
+
         // Apply viewport transformations
         points.applyTransform(
             zoom: Float(params.zoom),
             panX: Float(params.panX),
             panY: Float(params.panY)
         )
-        
+
         return points
     }
-    
+
     // MARK: - Internal Generation
-    
+
     private static func generateRawPoints(params: SpiralParams, numSteps: Int) -> SpiralPoints {
+        // Defensive check - should already be validated in generate()
+        guard numSteps > 0 else {
+            return SpiralPoints(capacity: 0)
+        }
         switch params.type {
         case .theodorus:
             return generateTheodorus(params: params, numSteps: numSteps)

@@ -35,13 +35,15 @@ export const NUM_STEPS_STEP = 10;
 export const NUM_STEPS_PERFORMANCE_MAX = 500;
 
 // URL Parameter Validation
-export const URL_SPIN_RATE_MAX = 10;
-export const URL_TIGHTNESS_MIN = 0.1;
-export const URL_TIGHTNESS_MAX = 50;
-export const URL_STEP_SIZE_MIN = 0.001;
-export const URL_STEP_SIZE_MAX = 1;
-export const URL_NUM_STEPS_MIN = 10;
-export const URL_NUM_STEPS_MAX = 10000;
+// These values match or are slightly more permissive than UI limits
+// to allow shared URLs to work correctly while preventing abuse
+export const URL_SPIN_RATE_MAX = SPIN_RATE_MAX; // Same as UI (2)
+export const URL_TIGHTNESS_MIN = TIGHTNESS_MIN; // Same as UI (0.5)
+export const URL_TIGHTNESS_MAX = TIGHTNESS_MAX; // Same as UI (10)
+export const URL_STEP_SIZE_MIN = STEP_SIZE_MIN; // Same as UI (0.01)
+export const URL_STEP_SIZE_MAX = STEP_SIZE_MAX; // Same as UI (0.5)
+export const URL_NUM_STEPS_MIN = NUM_STEPS_MIN; // Same as UI (50)
+export const URL_NUM_STEPS_MAX = NUM_STEPS_MAX; // Same as UI (2000)
 
 // Viewport
 export const VIEWPORT_SCALE_MIN = 0.5;

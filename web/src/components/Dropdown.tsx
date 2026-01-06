@@ -32,7 +32,9 @@ export function Dropdown<T extends string>({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const currentOption = options.find(o => o.id === value) || options[0];
+  const foundOption = options.find(o => o.id === value);
+  const fallbackOption = options[0];
+  const currentOption: DropdownOption<T> = foundOption ?? fallbackOption ?? { id: value, name: value };
 
   // Handle click outside to close
   useEffect(() => {
