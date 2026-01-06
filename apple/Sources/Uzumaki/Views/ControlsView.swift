@@ -4,7 +4,8 @@ import UzumakiCore
 /// Control panel for spiral parameters
 public struct ControlsView: View {
     @Bindable var viewModel: SpiralViewModel
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool = false
+    @Environment(\.openURL) private var openURL
     var onExport: (() -> Void)?
     var onShare: (() -> Void)?
 
@@ -25,213 +26,460 @@ public struct ControlsView: View {
             // Action bar (always visible)
             actionBar
 
+            // Quick presets strip (always visible)
+            quickPresetsStrip
+
             if isExpanded {
-                Divider()
-                    .background(Color.white.opacity(0.1))
+                VStack(spacing: 0) {
+                    Divider()
+                        .background(Color.white.opacity(0.1))
 
-                // Type and style selectors
-                configSection
+                    // Parameter sliders
+                    slidersSection
 
-                Divider()
-                    .background(Color.white.opacity(0.1))
+                    Divider()
+                        .background(Color.white.opacity(0.1))
 
-                // Sliders
-                slidersSection
+                    // Appearance options (colors, line style, background)
+                    configSection
 
-                // Toggles
-                togglesSection
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+
+                    // Attribution footer
+                    madeWithLoveFooter
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isExpanded)
+        .clipped()
+    }
+
+    // MARK: - Quick Presets Strip
+
+    private var quickPresetsStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(SpiralPreset.allPresets) { preset in
+                    presetChip(preset)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func presetChip(_ preset: SpiralPreset) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                viewModel.loadPreset(preset)
+            }
+        }) {
+            HStack(spacing: 6) {
+                // Mini color preview dots
+                HStack(spacing: 2) {
+                    ForEach(0..<min(3, preset.colorPreset.colors.count), id: \.self) { index in
+                        Circle()
+                            .fill(preset.colorPreset.colors[index])
+                            .frame(width: 5, height: 5)
+                    }
+                }
+
+                Text(preset.name)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isCurrentPreset(preset) ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isCurrentPreset(preset) ? Color.white.opacity(0.4) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Preset: \(preset.name)")
+        .accessibilityHint("Double tap to apply this preset")
+    }
+
+    private func isCurrentPreset(_ preset: SpiralPreset) -> Bool {
+        viewModel.spiralType == preset.type &&
+        viewModel.colorPreset == preset.colorPreset &&
+        viewModel.lineStyle == preset.lineStyle
     }
     
     // MARK: - Action Bar
 
     private var actionBar: some View {
-        HStack(spacing: 12) {
-            Button(action: viewModel.togglePause) {
-                Image(systemName: viewModel.isPaused ? "play.fill" : "pause.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .adaptiveSymbolTransition()
+        HStack(spacing: 0) {
+            // Play/Pause button
+            actionButton(
+                icon: viewModel.isPaused ? "play.fill" : "pause.fill",
+                help: viewModel.isPaused ? "Play (Space)" : "Pause (Space)",
+                action: viewModel.togglePause
+            )
+            .symbolEffect(.bounce, value: viewModel.isPaused)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .adaptiveGlassRoundedRect(cornerRadius: 12, interactive: true)
+
+            Spacer().frame(width: 12)
+
+            // Spiral type indicator (fills available space)
+            spiralTypeButton
+
+            Spacer().frame(width: 12)
+
+            // Expand/Collapse with rotation animation
+            Button(action: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                Image(systemName: "chevron.down")
+                    .font(.footnote.weight(.semibold))
+                    .rotationEffect(.degrees(isExpanded ? 0 : 180))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .help(viewModel.isPaused ? "Play (Space)" : "Pause (Space)")
-
-            Button(action: viewModel.reset) {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .help("Reset (R)")
-
-            Divider()
-                .frame(height: 20)
-
-            Button(action: { onExport?() }) {
-                Image(systemName: "square.and.arrow.down")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .help("Export (E)")
-
-            Button(action: { onShare?() }) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .help("Share")
-
-            // Favorite button with brand gradient and symbol effects
-            Button(action: { viewModel.toggleFavorite() }) {
-                Image(systemName: viewModel.isFavorited ? "heart.fill" : "heart")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(viewModel.isFavorited ? AnyShapeStyle(BrandColors.gradient) : AnyShapeStyle(.white))
-                    .symbolEffect(.bounce, value: viewModel.isFavorited)
-                    .adaptiveSymbolTransition()
-            }
-            .help(viewModel.isFavorited ? "Remove from favorites" : "Add to favorites")
-
-            Spacer()
-
-            Button(action: { isExpanded.toggle() }) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 14, weight: .medium))
-                    .adaptiveSymbolTransition()
-            }
+            .buttonStyle(.plain)
             .help(isExpanded ? "Collapse" : "Expand")
+            .accessibilityLabel(isExpanded ? "Collapse controls" : "Expand controls")
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func actionButton(icon: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.title3.weight(.medium))
+                .frame(width: 44, height: 44) // Minimum 44pt touch target (Apple HIG)
+                .contentShape(Rectangle())
+                .adaptiveSymbolTransition()
+        }
+        .help(help)
+        .accessibilityLabel(help)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var spiralTypeButton: some View {
+        Menu {
+            ForEach(SpiralType.allCases) { type in
+                Button(action: { viewModel.spiralType = type }) {
+                    HStack {
+                        Text(type.displayName)
+                        Text(type.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if viewModel.spiralType == type {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack {
+                Text(viewModel.spiralType.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .contentTransition(.identity)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .adaptiveGlassRoundedRect(cornerRadius: 12, interactive: true)
+        }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            // Share option
+            Button(action: { onShare?() }) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+
+            // Export option with keyboard hint
+            Button(action: { onExport?() }) {
+                Label("Export Image", systemImage: "square.and.arrow.down")
+            }
+            #if os(macOS)
+            .keyboardShortcut("e", modifiers: [])
+            #endif
+
+            Divider()
+
+            // Favorite toggle
+            Button(action: { viewModel.toggleFavorite() }) {
+                Label(
+                    viewModel.isFavorited ? "Remove from Favorites" : "Add to Favorites",
+                    systemImage: viewModel.isFavorited ? "heart.fill" : "heart"
+                )
+            }
+
+            Divider()
+
+            // Settings toggles
+            Toggle(isOn: $viewModel.lineThicknessVariation) {
+                Label("Variable Line Thickness", systemImage: "line.diagonal")
+            }
+
+            Toggle(isOn: $viewModel.performanceMode) {
+                Label("Fast Mode", systemImage: "hare")
+            }
+
+            #if os(macOS)
+            Divider()
+
+            // Keyboard shortcuts hint section
+            Section("Keyboard Shortcuts") {
+                Text("Space - Play/Pause")
+                Text("R - Reset")
+                Text("E - Export")
+            }
+            #endif
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.title2.weight(.medium))
+                .frame(width: 44, height: 44) // Minimum touch target
+                .contentShape(Rectangle())
+        }
+        .help("More Options")
+        .accessibilityLabel("More options menu")
     }
     
     // MARK: - Config Section
-    
+
     private var configSection: some View {
-        HStack(spacing: 12) {
-            // Spiral Type Picker
-            Menu {
-                ForEach(SpiralType.allCases) { type in
-                    Button(action: { viewModel.spiralType = type }) {
-                        HStack {
-                            Text(type.displayName)
-                            if viewModel.spiralType == type {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                configButton(label: "Spiral", value: viewModel.spiralType.displayName)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Color Preset Picker with swatch preview
+                colorPresetPicker
+
+                // Line Style Picker with icons
+                lineStylePicker
+
+                // Background Theme Picker
+                backgroundPicker
+
+                // More menu for secondary actions
+                moreMenu
             }
-            
-            // Color Preset Picker
-            Menu {
-                ForEach(ColorPreset.allCases) { preset in
-                    Button(action: { viewModel.colorPreset = preset }) {
-                        HStack {
-                            Text(preset.displayName)
-                            if viewModel.colorPreset == preset {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                configButton(label: "Colors", value: viewModel.colorPreset.displayName)
-            }
-            
-            // Line Style Picker
-            Menu {
-                ForEach(LineStyle.allCases) { style in
-                    Button(action: { viewModel.lineStyle = style }) {
-                        HStack {
-                            Text(style.displayName)
-                            if viewModel.lineStyle == style {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                configButton(label: "Style", value: viewModel.lineStyle.displayName)
-            }
-            
-            // Presets
-            Menu {
-                ForEach(SpiralPreset.allPresets) { preset in
-                    Button(preset.name) {
-                        viewModel.loadPreset(preset)
-                    }
-                }
-            } label: {
-                Label("Presets", systemImage: "sparkles")
-                    .font(.system(size: 13, weight: .medium))
-            }
-            
-            Spacer()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
-    
-    private func configButton(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
-            Text(value)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white)
+
+    private var colorPresetPicker: some View {
+        Menu {
+            ForEach(ColorPreset.allCases) { preset in
+                Button(action: { viewModel.colorPreset = preset }) {
+                    HStack {
+                        // Color swatch indicator
+                        HStack(spacing: 2) {
+                            ForEach(0..<min(3, preset.colors.count), id: \.self) { index in
+                                Circle()
+                                    .fill(preset.colors[index])
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
+                        Text(preset.displayName)
+                        Spacer()
+                        if viewModel.colorPreset == preset {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                // Mini color swatch
+                HStack(spacing: 2) {
+                    ForEach(0..<min(3, viewModel.colorPreset.colors.count), id: \.self) { index in
+                        Circle()
+                            .fill(viewModel.colorPreset.colors[index])
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                Text(viewModel.colorPreset.displayName)
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+    }
+
+    private var lineStylePicker: some View {
+        Menu {
+            ForEach(LineStyle.allCases) { style in
+                Button(action: { viewModel.lineStyle = style }) {
+                    HStack {
+                        Image(systemName: lineStyleIcon(for: style))
+                        Text(style.displayName)
+                        Spacer()
+                        if viewModel.lineStyle == style {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: lineStyleIcon(for: viewModel.lineStyle))
+                    .font(.caption.weight(.medium))
+                Text(viewModel.lineStyle.displayName)
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+        }
+    }
+
+    private func lineStyleIcon(for style: LineStyle) -> String {
+        switch style {
+        case .solid: return "line.diagonal"
+        case .dashed: return "line.horizontal.3"
+        case .dotted: return "ellipsis"
+        case .points: return "circle.grid.2x2"
+        case .triangles: return "triangle"
+        case .glow: return "sparkle"
+        }
+    }
+
+    private var backgroundPicker: some View {
+        Menu {
+            ForEach(BackgroundTheme.allCases) { theme in
+                Button(action: { viewModel.backgroundTheme = theme }) {
+                    HStack {
+                        Image(systemName: backgroundThemeIcon(for: theme))
+                        Text(theme.displayName)
+                        Spacer()
+                        if viewModel.backgroundTheme == theme {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: backgroundThemeIcon(for: viewModel.backgroundTheme))
+                    .font(.caption.weight(.medium))
+                Text("Background")
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .adaptiveGlassRoundedRect(cornerRadius: 8, interactive: true)
+        }
+    }
+
+    private func backgroundThemeIcon(for theme: BackgroundTheme) -> String {
+        switch theme {
+        case .dark: return "moon.fill"
+        case .black: return "circle.fill"
+        case .gradient: return "circle.lefthalf.filled"
+        case .matching: return "paintpalette"
+        }
     }
 
     // MARK: - Sliders Section
 
     private var slidersSection: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            parameterSlider(
-                label: "Speed",
-                value: $viewModel.spinRate,
-                range: Constants.spinRateMin...Constants.spinRateMax,
-                format: "%.2f"
-            )
+        VStack(spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                parameterSlider(
+                    label: "Animation Speed",
+                    value: $viewModel.spinRate,
+                    range: Constants.spinRateMin...Constants.spinRateMax,
+                    format: "%.2f"
+                )
 
-            parameterSlider(
-                label: "Tightness",
-                value: $viewModel.tightness,
-                range: Constants.tightnessMin...Constants.tightnessMax,
-                format: "%.1f"
-            )
+                parameterSlider(
+                    label: "Spiral Density",
+                    value: $viewModel.tightness,
+                    range: Constants.tightnessMin...Constants.tightnessMax,
+                    format: "%.1f"
+                )
 
-            parameterSlider(
-                label: "Detail",
-                value: $viewModel.stepSize,
-                range: Constants.stepSizeMin...Constants.stepSizeMax,
-                format: "%.2f"
-            )
+                parameterSlider(
+                    label: "Smoothness",
+                    value: $viewModel.stepSize,
+                    range: Constants.stepSizeMin...Constants.stepSizeMax,
+                    format: "%.2f"
+                )
 
-            // Points slider (Int)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Points")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
-                    Spacer()
-                    Text("\(viewModel.numSteps)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white)
+                // Complexity slider (Int)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Complexity")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.85))
+                        Spacer()
+                        Text("\(viewModel.numSteps)")
+                            .font(.caption2.weight(.semibold).monospaced())
+                            .foregroundStyle(.white.opacity(0.95))
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.numSteps) },
+                            set: { viewModel.numSteps = Int($0) }
+                        ),
+                        in: Double(Constants.numStepsMin)...Double(Constants.numStepsMax),
+                        step: Double(Constants.numStepsStep)
+                    )
+                    .tint(.white.opacity(0.8))
+                }
+            }
+
+            // Zoom, Pan, and FPS info (always visible, centered)
+            HStack(spacing: 16) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption2.weight(.medium))
+                    Text("\(viewModel.zoom, specifier: "%.1f")x")
+                        .font(.caption2.weight(.semibold).monospaced())
                 }
 
-                Slider(
-                    value: Binding(
-                        get: { Double(viewModel.numSteps) },
-                        set: { viewModel.numSteps = Int($0) }
-                    ),
-                    in: Double(Constants.numStepsMin)...Double(Constants.numStepsMax),
-                    step: Double(Constants.numStepsStep)
-                )
-                .tint(.white.opacity(0.8))
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                        .font(.caption2.weight(.medium))
+                    Text("\(Int(viewModel.panX)), \(Int(viewModel.panY))")
+                        .font(.caption2.weight(.semibold).monospaced())
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "speedometer")
+                        .font(.caption2.weight(.medium))
+                    Text("\(viewModel.fps) fps")
+                        .font(.caption2.weight(.semibold).monospaced())
+                        .contentTransition(.numericText())
+                }
             }
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(.white.opacity(0.6))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -246,12 +494,12 @@ public struct ControlsView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
                 Spacer()
                 Text(String(format: format, value.wrappedValue))
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
+                    .font(.caption2.weight(.semibold).monospaced())
+                    .foregroundStyle(.white.opacity(0.95))
             }
 
             Slider(value: value, in: range)
@@ -259,71 +507,52 @@ public struct ControlsView: View {
         }
     }
 
-    // MARK: - Toggles Section
+    // MARK: - Made with Love Footer
 
-    private var togglesSection: some View {
-        HStack(spacing: 12) {
-            Toggle("Variable Thickness", isOn: $viewModel.lineThicknessVariation)
-                .toggleStyle(ChipToggleStyle())
+    private var madeWithLoveFooter: some View {
+        Button(action: {
+            if let url = URL(string: "https://rye.dev") {
+                openURL(url)
+            }
+        }) {
+            HStack(spacing: 4) {
+                Text("made with")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.5))
 
-            Toggle("Performance Mode", isOn: $viewModel.performanceMode)
-                .toggleStyle(ChipToggleStyle())
+                BeatingHeart()
 
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-}
-
-// MARK: - Chip Toggle Style (iOS 26 Glass Enhanced)
-
-struct ChipToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Button(action: { configuration.isOn.toggle() }) {
-            chipContent(configuration: configuration)
+                Text("by Cameron Rye")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private func chipContent(configuration: Configuration) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(configuration.isOn ? Color.white : Color.white.opacity(0.3))
-                .frame(width: 8, height: 8)
-
-            configuration.label
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .adaptiveChipBackground(isOn: configuration.isOn)
+        .accessibilityLabel("Made with love by Cameron Rye. Tap to visit website.")
     }
 }
 
-// MARK: - Adaptive Chip Background
+// MARK: - Beating Heart
 
-extension View {
-    @ViewBuilder
-    func adaptiveChipBackground(isOn: Bool) -> some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            self.background {
-                if isOn {
-                    Capsule()
-                        .fill(.white.opacity(0.15))
-                } else {
-                    Capsule()
-                        .fill(.clear)
-                }
+/// Animated heart icon with a pulsing "beating" effect
+struct BeatingHeart: View {
+    @State private var isBeating = false
+
+    var body: some View {
+        Image(systemName: "heart.fill")
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(BrandColors.gradient)
+            .scaleEffect(isBeating ? 1.2 : 1.0)
+            .animation(
+                .easeInOut(duration: 0.5)
+                    .repeatForever(autoreverses: true),
+                value: isBeating
+            )
+            .onAppear {
+                isBeating = true
             }
-            .glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            self
-                .background(isOn ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
-                .clipShape(Capsule())
-        }
     }
 }
-

@@ -37,6 +37,12 @@ let package = Package(
             name: "UzumakiCoreTests",
             dependencies: ["UzumakiCore"],
             path: "Tests/UzumakiCoreTests"
+        ),
+        // Tests for UI and ViewModels
+        .testTarget(
+            name: "UzumakiUITests",
+            dependencies: ["UzumakiUI"],
+            path: "Tests/UzumakiUITests"
         )
     ]
 )

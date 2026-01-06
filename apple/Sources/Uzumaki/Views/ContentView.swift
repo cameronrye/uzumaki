@@ -1,16 +1,26 @@
 import SwiftUI
 import UzumakiCore
+#if os(iOS)
+import UIKit
+#endif
 
 /// Main content view for the Uzumaki app
 public struct ContentView: View {
     @State private var viewModel = SpiralViewModel()
-    
+
     // Gesture state
     @State private var currentZoom: Double = 1.0
     @State private var currentPan: CGSize = .zero
-    
+    @State private var showOnboardingHint: Bool = true
+
+    // Permission alert state
+    @State private var showPhotoPermissionAlert: Bool = false
+
+    // Environment for reduced motion
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     public init() {}
-    
+
     public var body: some View {
         ZStack {
             // Background
@@ -18,22 +28,32 @@ public struct ContentView: View {
                 .ignoresSafeArea()
 
             // Spiral Canvas with gestures
-            SpiralCanvasView(viewModel: viewModel)
-                .gesture(zoomGesture)
-                .gesture(panGesture)
-                .ignoresSafeArea()
+            GeometryReader { geometry in
+                SpiralCanvasView(viewModel: viewModel)
+                    .gesture(doubleTapGesture)
+                    .gesture(zoomGesture)
+                    .gesture(panGesture)
+                    .onAppear {
+                        viewModel.updateViewportScale(for: geometry.size)
+                    }
+                    .onChange(of: geometry.size) { _, newSize in
+                        viewModel.updateViewportScale(for: newSize)
+                    }
+            }
+            .ignoresSafeArea()
 
             // UI Overlay - wrapped in AdaptiveGlassContainer for iOS 26+
             AdaptiveGlassContainer {
                 VStack {
-                    // Header with subtle glass
-                    header
-
                     Spacer()
 
-                    // Zoom indicator
-                    zoomIndicator
-                        .padding(.bottom, 8)
+                    // Gesture hint (first launch)
+                    if showOnboardingHint {
+                        gestureHint
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    Spacer().frame(height: 8)
 
                     // Controls
                     ControlsView(viewModel: viewModel, onExport: exportSpiral, onShare: shareSpiral)
@@ -42,10 +62,37 @@ public struct ContentView: View {
                 }
             }
 
-            // Toast
+            // Toast (at top)
             if let message = viewModel.toastMessage {
                 toastView(message: message)
             }
+        }
+        .onAppear {
+            // Pause animation if user prefers reduced motion
+            if reduceMotion {
+                viewModel.isPaused = true
+            }
+
+            // Dismiss onboarding hint after a few seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showOnboardingHint = false
+                }
+            }
+        }
+        .onChange(of: reduceMotion) { _, newValue in
+            // Continuously respect reduced motion preference
+            if newValue {
+                viewModel.isPaused = true
+                viewModel.showToast("Animation paused (Reduce Motion enabled)")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Spiral Canvas")
+        .accessibilityHint("Interactive spiral visualization. Use gestures to zoom and pan.")
+        // Keyboard shortcuts for iOS (external keyboards) and macOS
+        .background {
+            keyboardShortcutButtons
         }
         #if os(macOS)
         .frame(minWidth: 800, minHeight: 600)
@@ -53,75 +100,103 @@ public struct ContentView: View {
             viewModel.togglePause()
         }
         .onReceive(NotificationCenter.default.publisher(for: .reset)) { _ in
-            viewModel.reset()
-            currentZoom = 1.0
-            currentPan = .zero
+            resetView()
         }
         .onReceive(NotificationCenter.default.publisher(for: .export)) { _ in
             exportSpiral()
         }
+        #else
+        .alert("Photo Library Access", isPresented: $showPhotoPermissionAlert) {
+            Button("Open Settings") {
+                ExportManager.openSettings()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Uzumaki needs access to your Photo Library to save spirals. Please enable access in Settings.")
+        }
         #endif
     }
-    
-    // MARK: - Header
 
-    private var header: some View {
-        HStack {
-            // Spiral logo matching web favicon
-            SpiralLogo(size: 28)
-                .rotationEffect(.degrees(viewModel.time * 18)) // Slow spin like web
+    // MARK: - Keyboard Shortcuts
 
-            Text("UZUMAKI")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+    /// Hidden buttons that provide keyboard shortcuts on iOS with external keyboards
+    @ViewBuilder
+    private var keyboardShortcutButtons: some View {
+        // Using a Group of hidden buttons to provide keyboard shortcuts
+        Group {
+            Button("") {
+                viewModel.togglePause()
+            }
+            .keyboardShortcut(.space, modifiers: [])
+
+            Button("") {
+                resetView()
+            }
+            .keyboardShortcut("r", modifiers: [])
+
+            Button("") {
+                exportSpiral()
+            }
+            .keyboardShortcut("e", modifiers: [])
         }
+        .buttonStyle(.plain)
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Gesture Hint
+
+    private var gestureHint: some View {
+        HStack(spacing: 16) {
+            hintItem(icon: "hand.pinch", text: "Pinch to zoom")
+            hintItem(icon: "hand.draw", text: "Drag to pan")
+            hintItem(icon: "hand.tap", text: "Double-tap to reset")
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.white.opacity(0.7))
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .adaptiveGlassCapsule()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
+        .padding(.bottom, 8)
     }
 
-    // MARK: - Zoom Indicator
-    
-    private var zoomIndicator: some View {
-        HStack(spacing: 16) {
-            Text("Zoom: \(viewModel.zoom, specifier: "%.1f")x")
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-
-            if viewModel.panX != 0 || viewModel.panY != 0 {
-                Text("Pan: \(Int(viewModel.panX)), \(Int(viewModel.panY))")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-            }
+    private func hintItem(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.footnote)
+            Text(text)
         }
-        .foregroundStyle(.white.opacity(0.7))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .adaptiveGlassCapsule()
     }
-    
+
     // MARK: - Toast
-    
+
     private func toastView(message: String) -> some View {
         VStack {
-            Spacer()
-
+            // Toast at top (Apple standard)
             Text(message)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.primary)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .adaptiveGlassCapsule()
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .padding(.top, 60)
 
-            Spacer().frame(height: 100)
+            Spacer()
         }
-        .animation(.spring(duration: 0.3), value: viewModel.toastMessage)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.toastMessage)
     }
-    
+
     // MARK: - Gestures
-    
+
+    private var doubleTapGesture: some Gesture {
+        TapGesture(count: 2)
+            .onEnded {
+                resetView()
+            }
+    }
+
     private var zoomGesture: some Gesture {
         MagnificationGesture()
             .onChanged { scale in
@@ -132,7 +207,7 @@ public struct ContentView: View {
                 currentZoom = viewModel.zoom
             }
     }
-    
+
     private var panGesture: some Gesture {
         DragGesture()
             .onChanged { value in
@@ -142,6 +217,23 @@ public struct ContentView: View {
             .onEnded { value in
                 currentPan = CGSize(width: viewModel.panX, height: viewModel.panY)
             }
+    }
+
+    // MARK: - Actions
+
+    private func resetView() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            viewModel.zoom = viewModel.spiralType.defaultZoom
+            viewModel.panX = 0
+            viewModel.panY = 0
+            currentZoom = viewModel.zoom
+            currentPan = .zero
+        }
+        #if os(iOS)
+        // Haptic feedback on iOS
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        #endif
     }
 
     // MARK: - Export
@@ -155,10 +247,14 @@ public struct ContentView: View {
                     viewModel.showToast("Spiral exported!")
                     #else
                     // On iOS, save to Photos
-                    let success = await ExportManager.saveToPhotos(data: data)
-                    if success {
+                    let result = await ExportManager.saveToPhotos(data: data)
+                    switch result {
+                    case .success:
                         viewModel.showToast("Saved to Photos!")
-                    } else {
+                        viewModel.triggerSuccessFeedback()
+                    case .permissionDenied:
+                        showPhotoPermissionAlert = true
+                    case .failed:
                         viewModel.showToast("Could not save to Photos")
                     }
                     #endif
@@ -178,9 +274,8 @@ public struct ContentView: View {
                     #if os(iOS)
                     ExportManager.share(data: data)
                     #else
-                    // macOS: use export for now
-                    ExportManager.savePNG(data: data)
-                    viewModel.showToast("Spiral exported!")
+                    // macOS: use proper share sheet
+                    ExportManager.share(data: data)
                     #endif
                 } else {
                     viewModel.showToast("Share failed")
@@ -190,75 +285,6 @@ public struct ContentView: View {
     }
 }
 
-// MARK: - Spiral Logo
-
-/// Custom spiral logo matching the web app favicon
-struct SpiralLogo: View {
-    let size: CGFloat
-
-    var body: some View {
-        Canvas { context, canvasSize in
-            // Scale to fit the canvas
-            let scale = min(canvasSize.width, canvasSize.height) / 24
-
-            // Create the spiral path matching web favicon
-            var path = Path()
-            path.move(to: CGPoint(x: 12 * scale, y: 12 * scale))
-
-            // First curve: c-2-2.67-6-2.67-6 2
-            path.addCurve(
-                to: CGPoint(x: 6 * scale, y: 14 * scale),
-                control1: CGPoint(x: 10 * scale, y: 9.33 * scale),
-                control2: CGPoint(x: 6 * scale, y: 9.33 * scale)
-            )
-
-            // Second curve: 0 3.5 2.5 6 6 6
-            path.addCurve(
-                to: CGPoint(x: 12 * scale, y: 20 * scale),
-                control1: CGPoint(x: 6 * scale, y: 17.5 * scale),
-                control2: CGPoint(x: 8.5 * scale, y: 20 * scale)
-            )
-
-            // Third curve: 5 0 8-4 8-8
-            path.addCurve(
-                to: CGPoint(x: 20 * scale, y: 12 * scale),
-                control1: CGPoint(x: 17 * scale, y: 20 * scale),
-                control2: CGPoint(x: 20 * scale, y: 16 * scale)
-            )
-
-            // Fourth curve: 0-6-4-10-10-10
-            path.addCurve(
-                to: CGPoint(x: 10 * scale, y: 2 * scale),
-                control1: CGPoint(x: 20 * scale, y: 6 * scale),
-                control2: CGPoint(x: 16 * scale, y: 2 * scale)
-            )
-
-            // Fifth curve: -8 0-12 6-12 12
-            path.addCurve(
-                to: CGPoint(x: -2 * scale, y: 14 * scale),
-                control1: CGPoint(x: 2 * scale, y: 2 * scale),
-                control2: CGPoint(x: -2 * scale, y: 8 * scale)
-            )
-
-            // Create gradient matching brand colors
-            let gradient = Gradient(colors: [BrandColors.primary, BrandColors.secondary])
-            let rect = CGRect(origin: .zero, size: canvasSize)
-
-            context.stroke(
-                path,
-                with: .linearGradient(
-                    gradient,
-                    startPoint: rect.origin,
-                    endPoint: CGPoint(x: rect.maxX, y: rect.maxY)
-                ),
-                style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round)
-            )
-        }
-        .frame(width: size, height: size)
-    }
-}
-
 #Preview {
     ContentView()
 }
-

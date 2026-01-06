@@ -48,29 +48,66 @@ public struct ExportManager {
             }
         }
     }
+
+    /// Share PNG using system share sheet (macOS)
+    public static func share(data: Data, from view: NSView? = nil) {
+        guard let image = NSImage(data: data) else { return }
+
+        // Get the key window and a view to anchor the picker
+        guard let window = NSApp.keyWindow,
+              let contentView = view ?? window.contentView else {
+            return
+        }
+
+        let picker = NSSharingServicePicker(items: [image])
+
+        // Show picker anchored to center of the view
+        let rect = CGRect(
+            x: contentView.bounds.midX,
+            y: contentView.bounds.midY,
+            width: 1,
+            height: 1
+        )
+        picker.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+    }
     #endif
+
+    /// Result of a save to photos operation
+    public enum SaveResult {
+        case success
+        case permissionDenied
+        case failed(Error?)
+    }
 
     /// Save PNG to Photos library (iOS)
     #if os(iOS)
-    public static func saveToPhotos(data: Data) async -> Bool {
-        guard let image = UIImage(data: data) else { return false }
+    public static func saveToPhotos(data: Data) async -> SaveResult {
+        guard let image = UIImage(data: data) else { return .failed(nil) }
 
         return await withCheckedContinuation { continuation in
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
                 guard status == .authorized || status == .limited else {
-                    continuation.resume(returning: false)
+                    continuation.resume(returning: .permissionDenied)
                     return
                 }
 
                 PHPhotoLibrary.shared().performChanges {
                     PHAssetCreationRequest.creationRequestForAsset(from: image)
                 } completionHandler: { success, error in
-                    if let error = error {
-                        print("Failed to save to Photos: \(error)")
+                    if success {
+                        continuation.resume(returning: .success)
+                    } else {
+                        continuation.resume(returning: .failed(error))
                     }
-                    continuation.resume(returning: success)
                 }
             }
+        }
+    }
+
+    /// Open the Settings app to the app's settings page
+    public static func openSettings() {
+        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(settingsURL)
         }
     }
 
@@ -106,95 +143,59 @@ public struct ExportManager {
 struct ExportableCanvas: View {
     let viewModel: SpiralViewModel
     let size: CGSize
-    
+
     var body: some View {
         Canvas { context, canvasSize in
             let points = viewModel.spiralPoints
             let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-            
-            // Draw based on line style (simplified for export)
+            let colors = viewModel.colors
+
+            // Draw based on line style using shared renderer
             switch viewModel.lineStyle {
             case .points:
-                drawPoints(context: context, points: points, center: center)
+                SpiralRenderer.drawPoints(
+                    context: context,
+                    points: points,
+                    center: center,
+                    colors: colors,
+                    zoom: viewModel.zoom
+                )
             case .triangles:
-                drawTriangles(context: context, points: points, center: center)
+                SpiralRenderer.drawTriangles(
+                    context: context,
+                    points: points,
+                    center: center,
+                    colors: colors
+                )
             case .glow:
-                drawGlow(context: context, points: points, center: center, glowOnly: true)
+                SpiralRenderer.drawGlow(
+                    context: context,
+                    points: points,
+                    center: center,
+                    glowColor: viewModel.glowColor,
+                    performanceMode: false,
+                    glowOnly: true
+                )
             default:
-                drawGlow(context: context, points: points, center: center, glowOnly: false)
-                drawLine(context: context, points: points, center: center)
+                SpiralRenderer.drawGlow(
+                    context: context,
+                    points: points,
+                    center: center,
+                    glowColor: viewModel.glowColor,
+                    performanceMode: false,
+                    glowOnly: false
+                )
+                SpiralRenderer.drawLine(
+                    context: context,
+                    points: points,
+                    center: center,
+                    colors: colors,
+                    lineStyle: viewModel.lineStyle
+                )
             }
         }
         .frame(width: size.width, height: size.height)
         .background(viewModel.backgroundColor)
-    }
-    
-    private func drawLine(context: GraphicsContext, points: SpiralPoints, center: CGPoint) {
-        guard points.count > 1 else { return }
-        
-        var path = Path()
-        path.move(to: CGPoint(x: center.x + CGFloat(points.x(at: 0)), y: center.y + CGFloat(points.y(at: 0))))
-        for i in 1..<points.count {
-            path.addLine(to: CGPoint(x: center.x + CGFloat(points.x(at: i)), y: center.y + CGFloat(points.y(at: i))))
-        }
-        
-        let gradient = Gradient(colors: viewModel.colors)
-        var strokeStyle = StrokeStyle(lineWidth: Constants.lineWidthDefault, lineCap: .round, lineJoin: .round)
-        strokeStyle.dash = viewModel.lineStyle.dashPattern
-        
-        context.stroke(path, with: .linearGradient(
-            gradient,
-            startPoint: CGPoint(x: center.x - 200, y: center.y - 200),
-            endPoint: CGPoint(x: center.x + 200, y: center.y + 200)
-        ), style: strokeStyle)
-    }
-    
-    private func drawPoints(context: GraphicsContext, points: SpiralPoints, center: CGPoint) {
-        let colors = viewModel.colors
-        let pointRadius = max(Constants.pointRadiusMin, Constants.pointRadiusBase * viewModel.zoom)
-        
-        for i in 0..<points.count {
-            let progress = Double(i) / Double(points.count)
-            let colorIndex = Int(progress * Double(colors.count - 1))
-            let color = colors[min(colorIndex, colors.count - 1)]
-            let point = CGPoint(x: center.x + CGFloat(points.x(at: i)), y: center.y + CGFloat(points.y(at: i)))
-            let rect = CGRect(x: point.x - pointRadius, y: point.y - pointRadius, width: pointRadius * 2, height: pointRadius * 2)
-            context.fill(Circle().path(in: rect), with: .color(color))
-        }
-    }
-    
-    private func drawTriangles(context: GraphicsContext, points: SpiralPoints, center: CGPoint) {
-        guard points.count > 1 else { return }
-        let colors = viewModel.colors
-        let origin = CGPoint(x: center.x + CGFloat(points.x(at: 0)), y: center.y + CGFloat(points.y(at: 0)))
-        
-        for i in 1..<points.count {
-            let progress = Double(i) / Double(points.count)
-            let colorIndex = Int(progress * Double(colors.count - 1))
-            let color = colors[min(colorIndex, colors.count - 1)]
-            
-            var path = Path()
-            path.move(to: origin)
-            if i > 1 { path.addLine(to: CGPoint(x: center.x + CGFloat(points.x(at: i - 1)), y: center.y + CGFloat(points.y(at: i - 1)))) }
-            path.addLine(to: CGPoint(x: center.x + CGFloat(points.x(at: i)), y: center.y + CGFloat(points.y(at: i))))
-            path.addLine(to: origin)
-            
-            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: Constants.lineWidthTriangles, lineCap: .round, lineJoin: .round))
-        }
-    }
-    
-    private func drawGlow(context: GraphicsContext, points: SpiralPoints, center: CGPoint, glowOnly: Bool) {
-        guard points.count > 1 else { return }
-        var path = Path()
-        path.move(to: CGPoint(x: center.x + CGFloat(points.x(at: 0)), y: center.y + CGFloat(points.y(at: 0))))
-        for i in 1..<points.count { path.addLine(to: CGPoint(x: center.x + CGFloat(points.x(at: i)), y: center.y + CGFloat(points.y(at: i)))) }
-        
-        let glowColor = viewModel.glowColor
-        for layer in Constants.glowLayersNormal {
-            let opacity = glowOnly ? layer.opacity * 2 : layer.opacity
-            let width = glowOnly ? layer.width * 1.5 : layer.width
-            context.stroke(path, with: .color(glowColor.opacity(opacity)), style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
-        }
     }
 }
 

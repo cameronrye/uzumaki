@@ -1,18 +1,22 @@
 import SwiftUI
 import UzumakiCore
+#if os(iOS)
+import UIKit
+#endif
 
 /// Main view model for the spiral visualizer using the new Observable macro
 @Observable
 @MainActor
 public final class SpiralViewModel {
-    
+
     // MARK: - Spiral Parameters
-    
+
     public var spiralType: SpiralType = .archimedean {
         didSet {
             zoom = spiralType.defaultZoom
             panX = 0
             panY = 0
+            triggerSelectionFeedback()
         }
     }
     
@@ -39,11 +43,20 @@ public final class SpiralViewModel {
     public var panY: Double = 0
     
     // MARK: - Animation State
-    
+
     public var time: Double = 0
     public var isPaused: Bool = false
     public var viewportScale: Double = 1.0
-    
+    public var fps: Int = 0
+
+    // FPS calculation (not observable)
+    private var frameCount: Int = 0
+    private var lastFPSUpdate: Double = 0
+
+    // Cached spiral points for performance
+    private var cachedSpiralPoints: SpiralPoints?
+    private var cachedSpiralParamsHash: Int = 0
+
     // MARK: - UI State
 
     public var showOnboarding: Bool = true
@@ -75,9 +88,37 @@ public final class SpiralViewModel {
         )
     }
     
-    /// Generate spiral points for current parameters
+    /// Generate spiral points for current parameters (cached for performance)
     public var spiralPoints: SpiralPoints {
-        SpiralGenerator.generate(params: params)
+        // Create a hash of parameters that affect spiral shape
+        let currentHash = spiralParamsHash
+
+        // Return cached points if parameters haven't changed
+        if let cached = cachedSpiralPoints, cachedSpiralParamsHash == currentHash {
+            return cached
+        }
+
+        // Generate new points and cache them
+        let points = SpiralGenerator.generate(params: params)
+        cachedSpiralPoints = points
+        cachedSpiralParamsHash = currentHash
+        return points
+    }
+
+    /// Hash of parameters that affect spiral geometry (excludes pan/zoom/isPaused)
+    private var spiralParamsHash: Int {
+        var hasher = Hasher()
+        hasher.combine(spiralType)
+        hasher.combine(tightness)
+        hasher.combine(spinRate)
+        hasher.combine(stepSize)
+        hasher.combine(numSteps)
+        hasher.combine(time)
+        hasher.combine(viewportScale)
+        hasher.combine(zoom)
+        hasher.combine(panX)
+        hasher.combine(panY)
+        return hasher.finalize()
     }
     
     /// Colors for the current preset
@@ -103,12 +144,13 @@ public final class SpiralViewModel {
     public init() {}
     
     // MARK: - Actions
-    
+
     /// Toggle play/pause
     public func togglePause() {
         isPaused.toggle()
+        triggerImpactFeedback(style: .light)
     }
-    
+
     /// Reset to default values
     public func reset() {
         spiralType = .archimedean
@@ -126,6 +168,7 @@ public final class SpiralViewModel {
         panY = 0
         time = 0
         isPaused = false
+        triggerImpactFeedback(style: .medium)
     }
     
     /// Load a preset
@@ -144,6 +187,15 @@ public final class SpiralViewModel {
     
     /// Increment time for animation
     public func incrementTime(delta: Double) {
+        // Update FPS counter
+        frameCount += 1
+        lastFPSUpdate += delta
+        if lastFPSUpdate >= 1.0 {
+            fps = frameCount
+            frameCount = 0
+            lastFPSUpdate = 0
+        }
+
         guard !isPaused else { return }
         time += delta
     }
@@ -179,6 +231,7 @@ public final class SpiralViewModel {
     /// Toggle favorite status
     public func toggleFavorite() {
         isFavorited.toggle()
+        triggerImpactFeedback()
         if isFavorited {
             showToast("Added to favorites")
         } else {
@@ -195,5 +248,46 @@ public final class SpiralViewModel {
         )
         viewportScale = scale
     }
+
+    // MARK: - Haptic Feedback
+
+    /// Trigger selection changed haptic (for picker changes)
+    public func triggerSelectionFeedback() {
+        #if os(iOS)
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+        #endif
+    }
+
+    /// Trigger impact haptic (for button taps)
+    public func triggerImpactFeedback(style: ImpactStyle = .light) {
+        #if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: style.uiKitStyle)
+        generator.impactOccurred()
+        #endif
+    }
+
+    /// Trigger success haptic (for completed actions)
+    public func triggerSuccessFeedback() {
+        #if os(iOS)
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        #endif
+    }
 }
 
+// MARK: - Impact Style Helper
+
+public enum ImpactStyle {
+    case light, medium, heavy
+
+    #if os(iOS)
+    var uiKitStyle: UIImpactFeedbackGenerator.FeedbackStyle {
+        switch self {
+        case .light: return .light
+        case .medium: return .medium
+        case .heavy: return .heavy
+        }
+    }
+    #endif
+}
