@@ -123,19 +123,24 @@ EOF
 capture_screenshot() {
     local filename="$1"
     local filepath="$SCREENSHOTS_DIR/$filename"
-    
-    # Get window ID for the app
-    local window_id=$(osascript -e 'tell application "System Events" to tell process "Uzumaki" to return id of first window' 2>/dev/null || echo "")
-    
+
+    # Get CGWindowID using Quartz (required for screencapture -l)
+    local window_id=$(python3 -c "
+import Quartz
+windows = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID)
+for w in windows:
+    if w.get('kCGWindowOwnerName') == 'Uzumaki':
+        print(w.get('kCGWindowNumber'))
+        break
+" 2>/dev/null)
+
     if [ -n "$window_id" ]; then
-        # Capture specific window
+        # Capture specific window by CGWindowID (no interaction needed)
         screencapture -l "$window_id" -o "$filepath"
+        log_success "Captured: $filename"
     else
-        # Fallback: capture frontmost window
-        screencapture -wo "$filepath"
+        log_error "Could not find Uzumaki window"
     fi
-    
-    log_success "Captured: $filename"
 }
 
 # Main
