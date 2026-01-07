@@ -52,7 +52,7 @@ export function BetaPage() {
           Join TestFlight Beta
         </a>
         <p className="testflight-note">
-          Requires iOS 17.0+, iPadOS 17.0+, or macOS 14.0+ with TestFlight installed.
+          Requires iOS 17.0+, iPadOS 17.0+, macOS 14.0+, or watchOS 10.0+ with TestFlight installed.
         </p>
       </div>
 
@@ -64,16 +64,24 @@ export function BetaPage() {
             <p>Experience smooth 120fps animations with Metal-powered rendering on Apple devices.</p>
           </div>
           <div className="feature-card">
-            <h3>New Spiral Types</h3>
-            <p>Preview upcoming spiral algorithms and mathematical patterns.</p>
+            <h3>Liquid Glass Design</h3>
+            <p>Beautiful iOS 26 / macOS 26 Liquid Glass effects with backward compatibility.</p>
+          </div>
+          <div className="feature-card">
+            <h3>watchOS App</h3>
+            <p>Digital Crown zoom, swipe gestures, and watch face complications.</p>
+          </div>
+          <div className="feature-card">
+            <h3>Haptic Feedback</h3>
+            <p>Feel the spirals with subtle haptic responses as you interact.</p>
           </div>
           <div className="feature-card">
             <h3>Export Options</h3>
             <p>Save spirals directly to your photo library or share to other apps.</p>
           </div>
           <div className="feature-card">
-            <h3>Haptic Feedback</h3>
-            <p>Feel the spirals with subtle haptic responses as you interact.</p>
+            <h3>iPadOS Optimizations</h3>
+            <p>Menu toggle for distraction-free full-screen spiral viewing.</p>
           </div>
         </div>
       </div>

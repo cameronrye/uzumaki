@@ -67,9 +67,18 @@ export function SupportPage() {
         <div className="faq-item">
           <h3>Are my settings saved?</h3>
           <p>
-            Your spiral configurations are stored locally in your browser or on your device. 
-            They are not synced across devices. Use the Share feature to save configurations 
+            Your spiral configurations are stored locally in your browser or on your device.
+            They are not synced across devices. Use the Share feature to save configurations
             as URLs that work anywhere.
+          </p>
+        </div>
+
+        <div className="faq-item">
+          <h3>How do I use the Apple Watch app?</h3>
+          <p>
+            Use the Digital Crown to zoom in and out. Tap the screen to play/pause,
+            double-tap to reset zoom, and swipe left/right to change presets.
+            Long press to access settings. You can also add Uzumaki to your watch face as a complication.
           </p>
         </div>
       </div>
@@ -81,6 +90,7 @@ export function SupportPage() {
           <li><strong>iOS:</strong> iOS 17.0 or later</li>
           <li><strong>iPadOS:</strong> iPadOS 17.0 or later</li>
           <li><strong>macOS:</strong> macOS 14.0 (Sonoma) or later</li>
+          <li><strong>watchOS:</strong> watchOS 10.0 or later</li>
         </ul>
       </div>
 

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  An interactive spiral visualization app for Web, iOS, and macOS.
+  An interactive spiral visualization app for Web, iOS, iPadOS, macOS, and watchOS.
 </p>
 
 <p align="center">
@@ -34,6 +34,7 @@
 - Real-time animation with adjustable speed
 - 10 color presets with gradient support
 - Line style options: Solid, Dashed, Dotted, Glow, Points, and Triangles
+- Variable line thickness for dynamic visuals
 - Theme options: Dark, Black, Gradient, and Matching backgrounds
 - Curated presets for interesting spiral configurations
 - Pan and zoom controls
@@ -41,6 +42,8 @@
 - Shareable URLs with encoded parameters
 - Keyboard shortcuts for quick control
 - Progressive Web App (PWA) support
+- iOS 26 / macOS 26 Liquid Glass design support
+- Web Workers with TypedArray optimization for smooth performance
 
 ## Showcase
 
@@ -215,15 +218,16 @@ npm run build
 npm run preview
 ```
 
-### Apple App (iOS / macOS)
+### Apple App (iOS / iPadOS / macOS / watchOS)
 
-A native SwiftUI implementation with the same features as the web app.
+A native SwiftUI implementation with the same features as the web app, plus platform-specific optimizations.
 
 #### Prerequisites
 
 - macOS 14.0+
 - Xcode 16+ (for development)
 - Swift 6.0+
+- iOS 17.0+ / iPadOS 17.0+ / watchOS 10.0+
 
 #### Build and Run
 
@@ -262,6 +266,16 @@ swift test
 - PNG export
 - Keyboard shortcuts (Space, R, E)
 - macOS menu bar integration
+- iOS 26 / macOS 26 Liquid Glass effects with backward compatibility
+- iPadOS menu toggle for full-screen experience
+
+#### watchOS Features
+
+- Digital Crown zoom control with haptic feedback
+- Swipe gestures for preset navigation
+- Tap to play/pause, double-tap to reset zoom
+- Long press for settings
+- Watch face complications (circular, corner, rectangular, inline)
 
 ## Keyboard Shortcuts
 

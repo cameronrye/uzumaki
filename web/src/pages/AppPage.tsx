@@ -12,7 +12,9 @@ import {
   GlobeIcon,
   PhoneIcon,
   TabletIcon,
-  MonitorIcon
+  MonitorIcon,
+  WatchIcon,
+  LayersIcon
 } from '../components/Icons';
 import './AppPage.css';
 
@@ -99,8 +101,18 @@ export function AppPage() {
           </div>
           <div className="feature">
             <div className="feature-icon"><ZapIcon size={32} color="var(--color-primary)" /></div>
-            <h3>Performance Mode</h3>
-            <p>Smooth animations even on older devices</p>
+            <h3>Web Worker Performance</h3>
+            <p>Smooth 60fps animations with TypedArray optimization</p>
+          </div>
+          <div className="feature">
+            <div className="feature-icon"><LayersIcon size={32} color="var(--color-primary)" /></div>
+            <h3>Liquid Glass Design</h3>
+            <p>Native iOS 26 / macOS 26 Liquid Glass effects</p>
+          </div>
+          <div className="feature">
+            <div className="feature-icon"><WatchIcon size={32} color="var(--color-primary)" /></div>
+            <h3>Apple Watch</h3>
+            <p>Digital Crown zoom, gestures, and watch face complications</p>
           </div>
         </div>
       </div>
@@ -130,6 +142,12 @@ export function AppPage() {
             <div className="platform-icon"><MonitorIcon size={40} color="var(--color-primary)" /></div>
             <h3>Mac</h3>
             <p>macOS 14.0+</p>
+            <a href="https://apps.apple.com/app/uzumaki/idXXXXXXXXXX" className="platform-link">App Store</a>
+          </div>
+          <div className="platform">
+            <div className="platform-icon"><WatchIcon size={40} color="var(--color-primary)" /></div>
+            <h3>Apple Watch</h3>
+            <p>watchOS 10.0+</p>
             <a href="https://apps.apple.com/app/uzumaki/idXXXXXXXXXX" className="platform-link">App Store</a>
           </div>
         </div>
