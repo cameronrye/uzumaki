@@ -60,15 +60,20 @@ public struct ControlsView: View {
     // MARK: - Quick Presets Strip
 
     private var quickPresetsStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(SpiralPreset.allPresets) { preset in
-                    presetChip(preset)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SpiralPreset.allPresets) { preset in
+                        presetChip(preset)
+                            .id(preset.id)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("QuickPresetsStrip")
     }
 
     private func presetChip(_ preset: SpiralPreset) -> some View {
@@ -102,10 +107,11 @@ public struct ControlsView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(isCurrentPreset(preset) ? Color.white.opacity(0.4) : Color.clear, lineWidth: 1)
             )
+            // Accessibility identifier on the content for XCTest to find
+            .accessibilityIdentifier("Preset_\(preset.name.replacingOccurrences(of: " ", with: "_"))")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Preset: \(preset.name)")
-        .accessibilityHint("Double tap to apply this preset")
+        // Also set identifier on the Button itself
+        .accessibilityIdentifier("Preset_\(preset.name.replacingOccurrences(of: " ", with: "_"))")
     }
 
     private func isCurrentPreset(_ preset: SpiralPreset) -> Bool {

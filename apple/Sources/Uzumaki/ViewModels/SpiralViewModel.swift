@@ -168,8 +168,19 @@ public final class SpiralViewModel {
     /// Flag to prevent saving while loading
     private var isLoadingSettings = false
 
+    /// Check if app is launched in screenshot mode (should reset to defaults)
+    private var isScreenshotMode: Bool {
+        ProcessInfo.processInfo.arguments.contains("-RESET_FOR_SCREENSHOTS")
+    }
+
     /// Load saved settings from UserDefaults
     private func loadSettings() {
+        // In screenshot mode, always use defaults (don't load saved state)
+        // This ensures consistent screenshots regardless of simulator state
+        if isScreenshotMode {
+            return
+        }
+
         isLoadingSettings = true
         defer { isLoadingSettings = false }
 
@@ -198,8 +209,8 @@ public final class SpiralViewModel {
 
     /// Save current settings to UserDefaults
     private func saveSettings() {
-        // Don't save while loading
-        guard !isLoadingSettings else { return }
+        // Don't save while loading or in screenshot mode
+        guard !isLoadingSettings, !isScreenshotMode else { return }
 
         let settings = UserSettings.shared
         settings.spiralType = spiralType

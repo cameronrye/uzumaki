@@ -21,8 +21,8 @@ platform :ios do
       dark_mode: true,
       concurrent_simulators: true,
       devices: [
-        "iPhone 17 Pro Max",
-        "iPad Pro 13-inch (M5)"
+        "iPhone 14 Plus",  # 6.5" display (1284x2778) - required by App Store Connect
+        "iPad Pro 13-inch (M5)"  # 13" display (2752x2064, 2064x2752, 2048x2732, or 2732x2048)
       ],
       languages: ["en-US"],
       launch_arguments: ["-FASTLANE_SNAPSHOT YES"],

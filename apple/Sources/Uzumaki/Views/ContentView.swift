@@ -140,6 +140,12 @@ public struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .export)) { _ in
             exportSpiral()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .loadPreset)) { notification in
+            if let presetId = notification.userInfo?["presetId"] as? String,
+               let preset = SpiralPreset.allPresets.first(where: { $0.id == presetId }) {
+                viewModel.loadPreset(preset)
+            }
+        }
         #else
         .alert("Photo Library Access", isPresented: $showPhotoPermissionAlert) {
             Button("Open Settings") {

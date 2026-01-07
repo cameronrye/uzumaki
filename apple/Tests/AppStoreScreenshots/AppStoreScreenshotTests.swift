@@ -128,22 +128,135 @@ final class AppStoreScreenshotTests: XCTestCase {
 
     // MARK: - Main Screenshot Sequence (App Store Required)
 
-    /// Captures all required App Store screenshots with full parameter variation
-    /// This is the primary method for generating diverse, visually striking screenshots
+    // Preset names matching SpiralPreset.allPresets in the app
+    private let presetNames = [
+        "Classic Golden",
+        "Sunflower",
+        "Fractal Dance",
+        "Chaos",
+        "Tight Archimedean",
+        "Hypnotic",
+        "Wheel of Theodorus",
+        "Trumpet",
+        "Matrix Rain",
+        "Deep Space"
+    ]
+
+    /// Captures all required App Store screenshots using the app's built-in presets
+    /// This ensures diverse, visually striking screenshots with reliable UI interaction
     func testCaptureAppStoreScreenshots() throws {
-        for (index, config) in enhancedCombinations.prefix(10).enumerated() {
-            applyConfiguration(config)
+        for (index, presetName) in presetNames.prefix(10).enumerated() {
+            // Tap the preset chip directly - these are always visible in the quick presets strip
+            selectPreset(presetName)
             helper.waitForStableState(timeout: 2.0)
 
             let screenshotName = String(
-                format: "%02d-%@-%@-%@",
+                format: "%02d-%@",
                 index + 1,
-                config.spiral,
-                config.color,
-                config.lineStyle.replacingOccurrences(of: " ", with: "")
+                presetName.replacingOccurrences(of: " ", with: "-")
             )
             helper.capture(name: screenshotName)
         }
+    }
+
+    /// Select a preset from the quick presets strip
+    /// Uses scrolling to ensure the button is visible before tapping
+    private func selectPreset(_ presetName: String) {
+        // Try multiple ways to find the preset element
+        // SwiftUI accessibility can be inconsistent across iOS versions
+        func findPresetElement() -> XCUIElement? {
+            // Method 1: Try by accessibility identifier (underscore format)
+            let identifier = "Preset_\(presetName.replacingOccurrences(of: " ", with: "_"))"
+            let button = app.buttons[identifier]
+            if button.exists { return button }
+
+            let other = app.otherElements[identifier]
+            if other.exists { return other }
+
+            // Method 2: Try finding by the static text label (preset name)
+            // This is often more reliable as SwiftUI always exposes Text content
+            let staticText = app.staticTexts[presetName]
+            if staticText.exists { return staticText }
+
+            // Method 3: Try button with the preset name as label
+            let labelButton = app.buttons[presetName]
+            if labelButton.exists { return labelButton }
+
+            // Method 4: Search all descendants
+            let anyElement = app.descendants(matching: .any)[identifier]
+            if anyElement.exists { return anyElement }
+
+            return nil
+        }
+
+        // Helper to tap element
+        func tryTapElement() -> Bool {
+            guard let element = findPresetElement() else { return false }
+
+            if element.isHittable {
+                element.tap()
+                sleep(2)  // Wait for spiral to render
+                return true
+            }
+
+            // Try coordinate tap if element exists but not hittable
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            sleep(2)
+            return true
+        }
+
+        // Wait briefly for element to appear
+        let staticText = app.staticTexts[presetName]
+        if staticText.waitForExistence(timeout: 1.0) {
+            if tryTapElement() { return }
+        }
+
+        // Find a scrollview to scroll through presets
+        // Get scrollviews and use the one most likely to be the presets strip
+        // (typically positioned at the bottom of the screen)
+        let scrollViews = app.scrollViews.allElementsBoundByIndex
+        guard !scrollViews.isEmpty else {
+            print("ERROR: No scrollviews found")
+            return
+        }
+
+        // Find the scrollview that's likely the presets strip
+        // It should be a horizontal strip near the bottom
+        var presetsScroll: XCUIElement?
+        for scroll in scrollViews {
+            let frame = scroll.frame
+            // Presets strip is typically narrow height and wide width
+            if frame.height < 100 && frame.width > 200 {
+                presetsScroll = scroll
+                break
+            }
+        }
+
+        // Fallback to first scrollview if we can't identify the presets strip
+        let scrollToUse = presetsScroll ?? scrollViews[0]
+
+        // Scroll all the way to the beginning first
+        for _ in 0..<5 {
+            scrollToUse.swipeRight()
+            usleep(150_000)
+        }
+        usleep(300_000)  // Let UI settle
+
+        // Now scroll left and try to tap when element is hittable
+        for attempt in 0..<15 {
+            if tryTapElement() { return }
+
+            scrollToUse.swipeLeft()
+            usleep(300_000)
+
+            // Debug output midway
+            if attempt == 7 {
+                let texts = app.staticTexts.allElementsBoundByIndex.prefix(15).map { $0.label }
+                print("Looking for '\(presetName)'. Available texts: \(texts)")
+            }
+        }
+
+        print("ERROR: Preset '\(presetName)' not found after scrolling")
     }
 
     // MARK: - Extended Screenshot Sequences

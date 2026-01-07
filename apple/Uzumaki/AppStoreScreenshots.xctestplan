@@ -41,8 +41,8 @@
       "name" : "Uzumaki"
     },
     "testTimeoutsEnabled" : true,
-    "defaultTestExecutionTimeAllowance" : 120,
-    "maximumTestExecutionTimeAllowance" : 300,
+    "defaultTestExecutionTimeAllowance" : 300,
+    "maximumTestExecutionTimeAllowance" : 600,
     "uiTestingScreenshotsLifetime" : "keepAlways"
   },
   "testTargets" : [
@@ -54,7 +54,8 @@
         "name" : "AppStoreScreenshotTests"
       },
       "selectedTests" : [
-        "AppStoreScreenshotTests\/testCaptureAppStoreScreenshots()"
+        "AppStoreScreenshotTests\/testCaptureAppStoreScreenshots()",
+        "MacAppStoreScreenshotTests\/testCaptureAppStoreScreenshots()"
       ]
     }
   ],

@@ -2,15 +2,14 @@
 # Run with: cd apple && fastlane snapshot
 
 # Devices to capture screenshots on
-# These match App Store Connect requirements for 2025
+# These match App Store Connect requirements
 devices([
-  # iPhone 6.9" (required) - iPhone 17 Pro Max, 16 Pro Max, etc.
-  "iPhone 17 Pro Max",
+  # iPhone 6.5" display (1284x2778) - required by App Store Connect
+  # Using iPhone 14 Plus which has exact 6.5" display dimensions
+  "iPhone 14 Plus",
 
-  # iPhone 6.5" (fallback for 6.9") - optional but recommended
-  # "iPhone 17 Pro",
-
-  # iPad 13" (required for iPad apps)
+  # iPad Pro 13-inch (M5) for 13" displays - produces 2752x2064 or 2064x2752 screenshots
+  # App Store Connect accepts: 2064x2752, 2752x2064, 2048x2732, or 2732x2048
   "iPad Pro 13-inch (M5)"
 ])
 
