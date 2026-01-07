@@ -83,7 +83,20 @@
 html, body, #root {
   width: 100%;
   height: 100%;
+}
+
+body {
   overflow: hidden;
+}
+
+/* Allow scrolling on page layouts (non-canvas pages) */
+body:has(.page-layout) {
+  overflow: auto;
+}
+
+body:has(.page-layout) #root {
+  height: auto;
+  min-height: 100%;
 }
 
 body {

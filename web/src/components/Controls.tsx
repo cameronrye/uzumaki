@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   SpiralType,
   SPIRAL_TYPES,
@@ -21,7 +22,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   SparklesIcon,
-  KeyboardIcon
+  KeyboardIcon,
+  AppleIcon
 } from './Icons';
 import './Controls.css';
 
@@ -255,6 +257,15 @@ export function Controls({
           </button>
 
           <span className="action-divider" />
+
+          <Link
+            to="/app"
+            className="action-btn"
+            aria-label="Get the app"
+            data-tooltip="Get App"
+          >
+            <AppleIcon size={18} />
+          </Link>
 
           {/* Expand/Collapse toggle */}
           <button

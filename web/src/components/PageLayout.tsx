@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { SpiralIcon, HeartIcon } from './Icons';
+import { ReactNode, useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { SpiralIcon, HeartIcon, MenuIcon, CloseIcon } from './Icons';
 import './PageLayout.css';
 
 interface PageLayoutProps {
@@ -9,7 +9,34 @@ interface PageLayoutProps {
   showBackLink?: boolean;
 }
 
+const navLinks = [
+  { to: '/', label: 'Web App' },
+  { to: '/app', label: 'Download' },
+  { to: '/beta', label: 'TestFlight' },
+  { to: '/support', label: 'Support' },
+];
+
 export function PageLayout({ children, title, showBackLink = true }: PageLayoutProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Close menu on route change
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen]);
+
   return (
     <div className="page-layout">
       <header className="page-header">
@@ -25,11 +52,53 @@ export function PageLayout({ children, title, showBackLink = true }: PageLayoutP
             </defs>
           </svg>
         </Link>
-        {showBackLink && (
-          <Link to="/" className="back-link">
-            Back to App
+
+        {/* Desktop navigation */}
+        <nav className="nav-desktop">
+          {navLinks.map(link => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`nav-link ${location.pathname === link.to ? 'active' : ''}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Mobile menu button */}
+        <button
+          className="menu-toggle"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={isMenuOpen}
+        >
+          {isMenuOpen ? <CloseIcon size={24} /> : <MenuIcon size={24} />}
+        </button>
+
+        {/* Mobile navigation overlay */}
+        <div className={`nav-mobile-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)} />
+
+        {/* Mobile navigation menu */}
+        <nav className={`nav-mobile ${isMenuOpen ? 'open' : ''}`}>
+          {navLinks.map(link => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`nav-mobile-link ${location.pathname === link.to ? 'active' : ''}`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              {link.label}
+            </Link>
+          ))}
+          <div className="nav-mobile-divider" />
+          <Link to="/privacy" className="nav-mobile-link secondary" onClick={() => setIsMenuOpen(false)}>
+            Privacy Policy
           </Link>
-        )}
+          <Link to="/terms" className="nav-mobile-link secondary" onClick={() => setIsMenuOpen(false)}>
+            Terms of Service
+          </Link>
+        </nav>
       </header>
 
       <main className="page-content">

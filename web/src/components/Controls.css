@@ -111,6 +111,7 @@
   cursor: pointer;
   transition: all var(--transition-base);
   position: relative;
+  text-decoration: none;
 }
 
 .action-btn:hover {
