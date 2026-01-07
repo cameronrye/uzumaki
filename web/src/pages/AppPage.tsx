@@ -20,7 +20,7 @@ import './AppPage.css';
 
 export function AppPage() {
   return (
-    <PageLayout showBackLink={false}>
+    <PageLayout>
       <div className="app-hero">
         <SpiralIcon size={80} color="url(#hero-spiral-gradient)" className="hero-icon" />
         <svg width="0" height="0">

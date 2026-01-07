@@ -6,7 +6,6 @@ import './PageLayout.css';
 interface PageLayoutProps {
   children: ReactNode;
   title?: string;
-  showBackLink?: boolean;
 }
 
 const navLinks = [
@@ -16,7 +15,7 @@ const navLinks = [
   { to: '/support', label: 'Support' },
 ];
 
-export function PageLayout({ children, title, showBackLink = true }: PageLayoutProps) {
+export function PageLayout({ children, title }: PageLayoutProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
 
