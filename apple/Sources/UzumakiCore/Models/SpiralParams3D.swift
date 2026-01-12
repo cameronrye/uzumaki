@@ -2,7 +2,7 @@ import Foundation
 
 /// Extended spiral parameters for 3D generation
 /// Includes all 2D parameters plus depth-specific options
-public struct SpiralParams3D: Equatable, Sendable, Codable {
+public struct SpiralParams3D: Equatable, Hashable, Sendable, Codable {
     
     // MARK: - Base 2D Parameters
     

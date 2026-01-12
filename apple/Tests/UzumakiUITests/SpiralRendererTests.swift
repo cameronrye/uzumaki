@@ -106,17 +106,19 @@ struct IntegrationTests {
     @Test("Params hash changes when parameters change")
     func testParamsHashChanges() {
         let viewModel = SpiralViewModel()
-        
+
+        // Set initial value that's different from what we'll change to
+        viewModel.numSteps = 100
         let points1 = viewModel.spiralPoints
         let count1 = points1.count
-        
-        // Change a parameter
-        viewModel.numSteps = 200
-        
+
+        // Change to a different value
+        viewModel.numSteps = 300
+
         let points2 = viewModel.spiralPoints
-        
+
         // Points should be regenerated with new count
-        #expect(points2.count == 200)
+        #expect(points2.count == 300)
         #expect(points2.count != count1)
     }
 }

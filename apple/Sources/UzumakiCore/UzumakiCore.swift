@@ -27,3 +27,10 @@ public typealias _SpiralPoint3D = SpiralPoint3D
 public typealias _SpiralPoints3D = SpiralPoints3D
 public typealias _SpiralGenerator3D = SpiralGenerator3D
 
+// Mesh Generation (Cross-platform)
+public typealias _SpiralMeshData = SpiralMeshData
+public typealias _GradientColor = GradientColor
+public typealias _Gradient = Gradient
+public typealias _TubeMeshGenerator = TubeMeshGenerator
+public typealias _TubeMeshError = TubeMeshError
+

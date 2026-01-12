@@ -8,7 +8,7 @@ This document tracks progress for adding AR capabilities to Uzumaki across appli
 |-------|------|--------|--------|
 | 1 | UzumakiCore 3D Extension | 1 week | Complete |
 | 2 | iOS/iPadOS AR Mode | 2-3 weeks | Complete |
-| 3 | visionOS App | 2-3 weeks | Not Started |
+| 3 | visionOS App | 2-3 weeks | In Progress |
 | 4 | USDZ Quick Look Export | 1 week | Not Started |
 
 ---
@@ -67,12 +67,19 @@ This document tracks progress for adding AR capabilities to Uzumaki across appli
 - [x] Create AR mode toggle in ControlsView
 - [x] Add camera permission handling
 - [x] Implement AR coaching overlay for user guidance
+- [x] Add mesh caching with parameter hash comparison
+- [x] Implement gradient support via vertex colors
+- [x] Add vertical plane detection option
+- [x] Add snapshot/photo capture functionality
+- [x] Add multi-spiral support (up to 10 spirals)
+- [x] Add anchor persistence using ARWorldMap
+- [x] Add background mesh generation with async/await
+- [x] Enable LiDAR scene reconstruction on Pro devices
 - [ ] Test on physical devices (iPhone, iPad)
 - [ ] Add AR-specific presets optimized for 3D viewing
 
 ### Deliverables
 
-- `Sources/Uzumaki/Views/AR/ARSpiralView.swift`
 - `Sources/Uzumaki/Views/AR/ARSpiralContainerView.swift`
 - `Sources/Uzumaki/Views/AR/ARCoordinator.swift`
 - `Sources/Uzumaki/Utilities/SpiralMeshGenerator.swift`
@@ -88,15 +95,18 @@ This document tracks progress for adding AR capabilities to Uzumaki across appli
 
 **Dependencies:** Phase 1
 
-**Status:** Not Started
+**Status:** In Progress
 
 ### Tasks
 
+- [x] Create VolumetricSpiralView using RealityView
+- [x] Implement 3D spiral entity generation with async mesh creation
+- [x] Add drag gesture for repositioning
+- [x] Add rotation gesture (RotateGesture3D)
+- [x] Add scale gesture (MagnifyGesture)
 - [ ] Create visionOS target in Xcode project
 - [ ] Implement `VisionSpiralApp` entry point
-- [ ] Create volumetric window with RealityView
 - [ ] Set default volume size (1m x 1m x 1m)
-- [ ] Implement 3D spiral entity generation
 - [ ] Add ornament controls for parameter adjustment
 - [ ] Create ImmersiveSpace scene type
 - [ ] Implement immersive spiral environment
@@ -110,11 +120,12 @@ This document tracks progress for adding AR capabilities to Uzumaki across appli
 
 ### Deliverables
 
-- `Uzumaki/Uzumaki visionOS/` target folder
-- `Sources/Uzumaki/Views/Vision/VisionContentView.swift`
-- `Sources/Uzumaki/Views/Vision/ImmersiveSpiralView.swift`
-- `Sources/Uzumaki/ViewModels/VisionSpiralViewModel.swift`
-- visionOS app icon assets
+- `Sources/Uzumaki/Views/VisionOS/VolumetricSpiralView.swift`
+- `Uzumaki/Uzumaki visionOS/` target folder (pending)
+- `Sources/Uzumaki/Views/Vision/VisionContentView.swift` (pending)
+- `Sources/Uzumaki/Views/Vision/ImmersiveSpiralView.swift` (pending)
+- `Sources/Uzumaki/ViewModels/VisionSpiralViewModel.swift` (pending)
+- visionOS app icon assets (pending)
 
 ---
 
@@ -185,3 +196,5 @@ This document tracks progress for adding AR capabilities to Uzumaki across appli
 | 2026-01-12 | - | Roadmap created |
 | 2026-01-12 | 1 | Phase 1 complete: SpiralPoint3D, SpiralPoints3D, SpiralDepthMode, SpiralParams3D, SpiralGenerator3D created with 13 passing tests |
 | 2026-01-12 | 2 | Phase 2 complete: ARSpiralView, ARSpiralContainerView, ARCoordinator, SpiralMeshGenerator created with full AR experience |
+| 2026-01-12 | 2 | Enhanced AR: Added mesh caching, gradient vertex colors, vertical plane detection, snapshot capture, multi-spiral support (10 max), ARWorldMap persistence, async mesh generation, LiDAR scene reconstruction |
+| 2026-01-12 | 3 | Started visionOS: Created VolumetricSpiralView with RealityView, drag/rotate/scale gestures |

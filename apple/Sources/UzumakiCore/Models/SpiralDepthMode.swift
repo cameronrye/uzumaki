@@ -1,7 +1,7 @@
 import Foundation
 
 /// Defines how 2D spiral points are extended into 3D space
-public enum SpiralDepthMode: Equatable, Sendable, Codable {
+public enum SpiralDepthMode: Equatable, Hashable, Sendable, Codable {
     /// All points remain on a flat plane at z = 0
     case flat
     

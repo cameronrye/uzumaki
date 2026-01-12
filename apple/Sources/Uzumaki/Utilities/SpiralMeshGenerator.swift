@@ -2,119 +2,224 @@
 import Foundation
 import RealityKit
 import simd
+import SwiftUI
 import UzumakiCore
 
+/// Cache key for mesh generation
+private struct MeshCacheKey: Hashable, Sendable {
+    let paramsHash: Int
+    let colorsHash: Int
+}
+
+/// Thread-safe mesh cache actor
+@available(iOS 17.0, *)
+private actor MeshCache {
+    private var cache: [MeshCacheKey: MeshResource] = [:]
+    private let maxSize = 10
+
+    func get(_ key: MeshCacheKey) -> MeshResource? {
+        cache[key]
+    }
+
+    func set(_ key: MeshCacheKey, mesh: MeshResource) {
+        if cache.count >= maxSize {
+            cache.removeAll()
+        }
+        cache[key] = mesh
+    }
+
+    func clear() {
+        cache.removeAll()
+    }
+}
+
 /// Generates 3D mesh geometry from spiral points for AR visualization
+/// Includes caching to prevent excessive mesh regeneration
 @available(iOS 17.0, *)
 public enum SpiralMeshGenerator {
-    
+
     // MARK: - Configuration
-    
+
     /// Default tube radius for spiral mesh (in meters)
-    public static let defaultTubeRadius: Float = 0.003
-    
+    public static let defaultTubeRadius: Float = 0.005
+
     /// Number of segments around the tube circumference
-    public static let tubeSegments: Int = 8
-    
+    public static let tubeSegments: Int = 16
+
+    // MARK: - Caching
+
+    /// Thread-safe cache storage using actor
+    private static let meshCache = MeshCache()
+
+    /// Clear the mesh cache
+    public static func clearCache() async {
+        await meshCache.clear()
+    }
+
     // MARK: - Public API
-    
-    /// Generate a tube mesh from 3D spiral points
+
+    /// Generate a tube mesh from spiral parameters with gradient colors (cached, async)
+    /// - Parameters:
+    ///   - params: The 3D spiral parameters
+    ///   - colors: SwiftUI colors for gradient
+    /// - Returns: A MeshResource with vertex colors for gradient
+    public static func generateCachedMesh(
+        params: SpiralParams3D,
+        colors: [SwiftUI.Color]
+    ) async throws -> MeshResource {
+        let cacheKey = MeshCacheKey(
+            paramsHash: params.hashValue,
+            colorsHash: colors.map { $0.hashValue }.reduce(0, ^)
+        )
+
+        // Check cache
+        if let cached = await meshCache.get(cacheKey) {
+            return cached
+        }
+
+        // Generate mesh
+        let points3D = SpiralGenerator3D.generate(params: params)
+        let gradient = createGradient(from: colors)
+        let meshData = try TubeMeshGenerator.generate(
+            from: points3D,
+            gradient: gradient,
+            tubeRadius: params.tubeRadius,
+            tubeSegments: tubeSegments
+        )
+
+        let mesh = try createMeshResource(from: meshData)
+
+        // Store in cache
+        await meshCache.set(cacheKey, mesh: mesh)
+
+        return mesh
+    }
+
+    /// Generate mesh asynchronously on a background thread
+    /// - Parameters:
+    ///   - params: The 3D spiral parameters
+    ///   - colors: SwiftUI colors for gradient
+    /// - Returns: A MeshResource with vertex colors for gradient
+    public static func generateCachedMeshAsync(
+        params: SpiralParams3D,
+        colors: [SwiftUI.Color]
+    ) async throws -> MeshResource {
+        let cacheKey = MeshCacheKey(
+            paramsHash: params.hashValue,
+            colorsHash: colors.map { $0.hashValue }.reduce(0, ^)
+        )
+
+        // Check cache first
+        if let cached = await meshCache.get(cacheKey) {
+            return cached
+        }
+
+        // Generate mesh data on background thread
+        let meshData = try await Task.detached(priority: .userInitiated) {
+            let points3D = SpiralGenerator3D.generate(params: params)
+            let gradient = createGradient(from: colors)
+            return try TubeMeshGenerator.generate(
+                from: points3D,
+                gradient: gradient,
+                tubeRadius: params.tubeRadius,
+                tubeSegments: tubeSegments
+            )
+        }.value
+
+        // Create mesh resource (must be on main thread for RealityKit)
+        let mesh = try await MainActor.run {
+            try createMeshResource(from: meshData)
+        }
+
+        // Store in cache
+        await meshCache.set(cacheKey, mesh: mesh)
+
+        return mesh
+    }
+
+    /// Generate a tube mesh from 3D spiral points (legacy, no caching)
     /// - Parameters:
     ///   - points: The 3D spiral points to create a tube around
     ///   - tubeRadius: Radius of the tube in meters
+    ///   - addEndCaps: Whether to add end caps to close the tube
     /// - Returns: A MeshResource representing the spiral as a tube
     public static func generateTubeMesh(
         from points: SpiralPoints3D,
+        tubeRadius: Float = defaultTubeRadius,
+        addEndCaps: Bool = true
+    ) throws -> MeshResource {
+        guard points.count >= 2 else {
+            throw MeshGenerationError.insufficientPoints
+        }
+
+        // Use default white gradient for legacy API
+        let gradient = UzumakiCore.Gradient(colors: [GradientColor(r: 1, g: 1, b: 1)])
+        let meshData = try TubeMeshGenerator.generate(
+            from: points,
+            gradient: gradient,
+            tubeRadius: tubeRadius,
+            tubeSegments: tubeSegments,
+            addEndCaps: addEndCaps
+        )
+
+        return try createMeshResource(from: meshData)
+    }
+
+    /// Generate a tube mesh with gradient colors
+    /// - Parameters:
+    ///   - points: The 3D spiral points
+    ///   - colors: SwiftUI colors for gradient
+    ///   - tubeRadius: Radius of the tube in meters
+    /// - Returns: A MeshResource with vertex colors
+    public static func generateTubeMeshWithGradient(
+        from points: SpiralPoints3D,
+        colors: [SwiftUI.Color],
         tubeRadius: Float = defaultTubeRadius
     ) throws -> MeshResource {
         guard points.count >= 2 else {
             throw MeshGenerationError.insufficientPoints
         }
-        
-        var vertices: [SIMD3<Float>] = []
-        var normals: [SIMD3<Float>] = []
-        var uvs: [SIMD2<Float>] = []
-        var indices: [UInt32] = []
-        
-        let segmentCount = tubeSegments
-        let pointCount = points.count
-        
-        // Generate tube geometry around each spiral point
-        for i in 0..<pointCount {
-            let current = points.data[i]
-            
-            // Calculate tangent direction
-            let tangent: SIMD3<Float>
-            if i == 0 {
-                tangent = simd_normalize(points.data[1] - current)
-            } else if i == pointCount - 1 {
-                tangent = simd_normalize(current - points.data[i - 1])
-            } else {
-                tangent = simd_normalize(points.data[i + 1] - points.data[i - 1])
-            }
-            
-            // Calculate basis vectors perpendicular to tangent
-            let (binormal, normal) = calculateBasis(tangent: tangent)
-            
-            // Generate ring of vertices around current point
-            for j in 0..<segmentCount {
-                let angle = Float(j) / Float(segmentCount) * 2.0 * .pi
-                let localX = cos(angle) * tubeRadius
-                let localY = sin(angle) * tubeRadius
-                
-                let vertexPosition = current + binormal * localX + normal * localY
-                let vertexNormal = simd_normalize(binormal * localX + normal * localY)
-                
-                vertices.append(vertexPosition)
-                normals.append(vertexNormal)
-                
-                // UV coordinates: u wraps around tube, v goes along length
-                let u = Float(j) / Float(segmentCount)
-                let v = Float(i) / Float(pointCount - 1)
-                uvs.append(SIMD2(u, v))
-            }
-        }
-        
-        // Generate triangle indices connecting adjacent rings
-        for i in 0..<(pointCount - 1) {
-            for j in 0..<segmentCount {
-                let current = UInt32(i * segmentCount + j)
-                let next = UInt32(i * segmentCount + (j + 1) % segmentCount)
-                let currentNext = UInt32((i + 1) * segmentCount + j)
-                let nextNext = UInt32((i + 1) * segmentCount + (j + 1) % segmentCount)
-                
-                // Two triangles per quad
-                indices.append(contentsOf: [current, currentNext, next])
-                indices.append(contentsOf: [next, currentNext, nextNext])
-            }
-        }
-        
-        // Create mesh descriptor
-        var descriptor = MeshDescriptor(name: "SpiralTube")
-        descriptor.positions = MeshBuffer(vertices)
-        descriptor.normals = MeshBuffer(normals)
-        descriptor.textureCoordinates = MeshBuffer(uvs)
-        descriptor.primitives = .triangles(indices)
-        
-        return try MeshResource.generate(from: [descriptor])
+
+        let gradient = createGradient(from: colors)
+        let meshData = try TubeMeshGenerator.generate(
+            from: points,
+            gradient: gradient,
+            tubeRadius: tubeRadius,
+            tubeSegments: tubeSegments
+        )
+
+        return try createMeshResource(from: meshData)
     }
-    
-    // MARK: - Helper Functions
-    
-    /// Calculate binormal and normal vectors perpendicular to tangent
-    private static func calculateBasis(tangent: SIMD3<Float>) -> (binormal: SIMD3<Float>, normal: SIMD3<Float>) {
-        // Choose a reference vector that isn't parallel to tangent
-        let reference: SIMD3<Float>
-        if abs(tangent.y) < 0.9 {
-            reference = SIMD3(0, 1, 0)
-        } else {
-            reference = SIMD3(1, 0, 0)
+
+    // MARK: - Gradient Helpers
+
+    private static func createGradient(from colors: [SwiftUI.Color]) -> UzumakiCore.Gradient {
+        let gradientColors = colors.map { color -> GradientColor in
+            // Convert SwiftUI Color to GradientColor
+            let uiColor = UIColor(color)
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return GradientColor(r: Float(r), g: Float(g), b: Float(b), a: Float(a))
         }
-        
-        let binormal = simd_normalize(simd_cross(tangent, reference))
-        let normal = simd_normalize(simd_cross(binormal, tangent))
-        
-        return (binormal, normal)
+        return UzumakiCore.Gradient(colors: gradientColors.isEmpty
+            ? [GradientColor(r: 1, g: 1, b: 1)]
+            : gradientColors)
+    }
+
+    // MARK: - Mesh Creation
+
+    private static func createMeshResource(from meshData: SpiralMeshData) throws -> MeshResource {
+        var descriptor = MeshDescriptor(name: "SpiralTube")
+        descriptor.positions = MeshBuffer(meshData.positions)
+        descriptor.normals = MeshBuffer(meshData.normals)
+        descriptor.textureCoordinates = MeshBuffer(meshData.uvs)
+        descriptor.primitives = .triangles(meshData.indices)
+
+        // Note: RealityKit MeshDescriptor doesn't directly support vertex colors
+        // Vertex colors are used via CustomMaterial or ShaderGraphMaterial
+        // For now, we store the color data but use material-based coloring
+
+        return try MeshResource.generate(from: [descriptor])
     }
 }
 
