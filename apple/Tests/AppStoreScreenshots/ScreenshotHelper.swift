@@ -15,6 +15,7 @@ public final class ScreenshotHelper {
         case iPad = "iPad-13"             // 13" displays (2064x2752, 2752x2064, 2048x2732, 2732x2048)
         case mac = "Mac"
         case watch = "Watch"
+        case appleTV = "AppleTV"          // 1920x1080 (1080p) or 3840x2160 (4K)
 
         /// Returns the current device category based on screen size
         /// Uses XCUIScreen for accurate detection in UI tests
@@ -23,6 +24,8 @@ public final class ScreenshotHelper {
             return .watch
             #elseif os(macOS)
             return .mac
+            #elseif os(tvOS)
+            return .appleTV
             #else
             // iPad detection
             if UIDevice.current.userInterfaceIdiom == .pad {

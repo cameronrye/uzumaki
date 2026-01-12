@@ -1,0 +1,19 @@
+{
+  "images" : [
+    {
+      "filename" : "tvos-icon-front.png",
+      "idiom" : "tv",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "tvos-icon-front@2x.png",
+      "idiom" : "tv",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+

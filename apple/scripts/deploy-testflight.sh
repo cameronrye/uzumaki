@@ -37,8 +37,8 @@ if [[ "${2:-}" == "--archive-only" ]]; then
 fi
 
 # Validate platform argument
-if [[ ! "$PLATFORM" =~ ^(ios|macos|all)$ ]]; then
-    log_error "Invalid platform: $PLATFORM. Use 'ios', 'macos', or 'all'"
+if [[ ! "$PLATFORM" =~ ^(ios|macos|tvos|all)$ ]]; then
+    log_error "Invalid platform: $PLATFORM. Use 'ios', 'macos', 'tvos', or 'all'"
     exit 1
 fi
 
@@ -155,6 +155,7 @@ EXPORTEOF
 main() {
     local ios_success=true
     local macos_success=true
+    local tvos_success=true
 
     if [[ "$PLATFORM" == "ios" || "$PLATFORM" == "all" ]]; then
         log_info "=== iOS Build ==="
@@ -186,6 +187,21 @@ main() {
         fi
     fi
 
+    if [[ "$PLATFORM" == "tvos" || "$PLATFORM" == "all" ]]; then
+        log_info "=== tvOS Build ==="
+        if archive_app "tvos" "generic/platform=tvOS"; then
+            TVOS_ARCHIVE="$LAST_ARCHIVE_PATH"
+            if [[ "$ARCHIVE_ONLY" == false ]]; then
+                upload_to_testflight "$TVOS_ARCHIVE" "tvos" || tvos_success=false
+            else
+                log_info "Archive only mode - skipping upload"
+                log_info "tvOS Archive: $TVOS_ARCHIVE"
+            fi
+        else
+            tvos_success=false
+        fi
+    fi
+
     echo ""
     log_info "=== Summary ==="
 
@@ -193,7 +209,7 @@ main() {
         log_success "Archives created successfully!"
         log_info "To upload manually: Xcode > Window > Organizer > Archives"
     else
-        if [[ "$ios_success" == true ]] && [[ "$macos_success" == true ]]; then
+        if [[ "$ios_success" == true ]] && [[ "$macos_success" == true ]] && [[ "$tvos_success" == true ]]; then
             log_success "All builds uploaded to TestFlight!"
             log_info "Builds will be processed by Apple (5-30 minutes)"
             log_info "Check status: https://appstoreconnect.apple.com/apps/6757408848/testflight"

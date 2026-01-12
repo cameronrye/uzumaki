@@ -1,3 +1,4 @@
+#if os(iOS)
 import XCTest
 
 /// UI Tests specifically for capturing App Store screenshots
@@ -642,4 +643,4 @@ final class AppStoreScreenshotTests: XCTestCase {
         }
     }
 }
-
+#endif

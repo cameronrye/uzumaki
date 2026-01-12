@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  An interactive spiral visualization app for Web, iOS, iPadOS, macOS, and watchOS.
+  An interactive spiral visualization app for Web, iOS, iPadOS, macOS, tvOS, and watchOS.
 </p>
 
 <p align="center">
@@ -65,6 +65,14 @@
     <td align="center"><img src="assets/screenshots/candy-lituus.png" width="400"><br><strong>Lituus Candy</strong></td>
   </tr>
 </table>
+
+### Apple TV
+
+<p align="center">
+  <img src="assets/screenshots/appletv-classic-golden.png" alt="Uzumaki on Apple TV" width="800">
+</p>
+
+Experience Uzumaki on the big screen with Apple TV. Navigate using the Siri Remote, explore curated presets from the Top Shelf, and enjoy 4K visuals.
 
 ### Color Presets
 
@@ -218,7 +226,7 @@ npm run build
 npm run preview
 ```
 
-### Apple App (iOS / iPadOS / macOS / watchOS)
+### Apple App (iOS / iPadOS / macOS / tvOS / watchOS)
 
 A native SwiftUI implementation with the same features as the web app, plus platform-specific optimizations.
 
@@ -227,7 +235,7 @@ A native SwiftUI implementation with the same features as the web app, plus plat
 - macOS 14.0+
 - Xcode 16+ (for development)
 - Swift 6.0+
-- iOS 17.0+ / iPadOS 17.0+ / watchOS 10.0+
+- iOS 17.0+ / iPadOS 17.0+ / tvOS 17.0+ / watchOS 10.0+
 
 #### Build and Run
 
@@ -268,6 +276,14 @@ swift test
 - macOS menu bar integration
 - iOS 26 / macOS 26 Liquid Glass effects with backward compatibility
 - iPadOS menu toggle for full-screen experience
+
+#### tvOS Features
+
+- Siri Remote gesture support (swipe, click, play/pause)
+- Focus-based navigation optimized for TV
+- Top Shelf integration with curated spiral previews
+- 4K display support for stunning visuals
+- Game Controller support
 
 #### watchOS Features
 

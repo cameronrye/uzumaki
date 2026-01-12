@@ -1,3 +1,4 @@
+#if os(macOS)
 @preconcurrency import XCTest
 
 /// UI Tests specifically for capturing macOS App Store screenshots
@@ -138,4 +139,4 @@ final class MacAppStoreScreenshotTests: XCTestCase {
         }
     }
 }
-
+#endif

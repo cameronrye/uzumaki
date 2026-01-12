@@ -74,6 +74,16 @@ export function SupportPage() {
         </div>
 
         <div className="faq-item">
+          <h3>How do I use the Apple TV app?</h3>
+          <p>
+            Use the Siri Remote to navigate: swipe to change presets, click to play/pause,
+            and use the play/pause button for animation control. The app also supports
+            game controllers for an alternative navigation experience. Check out the
+            Top Shelf for quick access to curated spiral presets.
+          </p>
+        </div>
+
+        <div className="faq-item">
           <h3>How do I use the Apple Watch app?</h3>
           <p>
             Use the Digital Crown to zoom in and out. Tap the screen to play/pause,
@@ -90,6 +100,7 @@ export function SupportPage() {
           <li><strong>iOS:</strong> iOS 17.0 or later</li>
           <li><strong>iPadOS:</strong> iPadOS 17.0 or later</li>
           <li><strong>macOS:</strong> macOS 14.0 (Sonoma) or later</li>
+          <li><strong>tvOS:</strong> tvOS 17.0 or later</li>
           <li><strong>watchOS:</strong> watchOS 10.0 or later</li>
         </ul>
       </div>

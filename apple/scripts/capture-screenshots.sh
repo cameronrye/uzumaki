@@ -1,12 +1,13 @@
 #!/bin/bash
 # capture-screenshots.sh - Automated App Store screenshot capture for Uzumaki
-# Supports iOS, iPad, macOS, and watchOS
+# Supports iOS, iPad, macOS, watchOS, and tvOS
 #
 # Usage:
 #   ./scripts/capture-screenshots.sh           # Capture all platforms
 #   ./scripts/capture-screenshots.sh --ios     # iOS only (iPhone + iPad)
 #   ./scripts/capture-screenshots.sh --mac     # macOS only
 #   ./scripts/capture-screenshots.sh --watch   # watchOS only
+#   ./scripts/capture-screenshots.sh --tv      # tvOS only (Apple TV)
 #   ./scripts/capture-screenshots.sh --fastlane # Use fastlane (iOS/iPad only)
 
 set -e
@@ -25,6 +26,8 @@ IPHONE_DEVICE="iPhone 14 Plus"
 IPAD_DEVICE="iPad Pro 13-inch (M5)"
 WATCH_DEVICE="Apple Watch Series 11 (46mm)"
 WATCH_PAIRED_PHONE="iPhone 17 Pro"
+# Apple TV 4K (3rd generation) for 1920x1080 screenshots
+TV_DEVICE="Apple TV 4K (3rd generation)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -45,6 +48,7 @@ setup_directories() {
     mkdir -p "$SCREENSHOTS_DIR/iPad"
     mkdir -p "$SCREENSHOTS_DIR/Mac"
     mkdir -p "$SCREENSHOTS_DIR/Watch"
+    mkdir -p "$SCREENSHOTS_DIR/AppleTV"
     mkdir -p "$SCREENSHOTS_DIR/raw"
 }
 
@@ -179,6 +183,40 @@ capture_watch() {
     shutdown_simulator "$WATCH_PAIRED_PHONE"
 
     log_success "watchOS screenshots captured!"
+}
+
+# Capture tvOS screenshots using UI tests
+# Uses focus-based navigation to select all 10 presets
+capture_tv() {
+    log_info "=== Capturing tvOS Screenshots ==="
+    log_info "Target resolution: 1920x1080 (1080p HD)"
+    log_info "Using 10 presets: Classic Golden, Sunflower, Fractal Dance, Chaos,"
+    log_info "  Tight Archimedean, Hypnotic, Wheel of Theodorus, Trumpet, Matrix Rain, Deep Space"
+
+    boot_simulator "$TV_DEVICE"
+
+    local result_bundle="$SCREENSHOTS_DIR/raw/tv-results.xcresult"
+    rm -rf "$result_bundle"
+
+    # Run UI tests on Apple TV app - uses focus navigation to select presets
+    # The test navigates through all 10 presets using the Presets view
+    xcodebuild test \
+        -project "$XCODE_PROJECT" \
+        -scheme "$SCHEME" \
+        -destination "platform=tvOS Simulator,name=$TV_DEVICE" \
+        -only-testing:AppStoreScreenshotTests/TVAppStoreScreenshotTests/testCaptureAppStoreScreenshots \
+        -resultBundlePath "$result_bundle" \
+        2>&1 | tee /tmp/xcodebuild-tv.log || true
+
+    # Extract screenshots from result bundle
+    extract_screenshots "$result_bundle" "$SCREENSHOTS_DIR/AppleTV"
+
+    shutdown_simulator "$TV_DEVICE"
+
+    log_info "tvOS App Store accepted resolutions:"
+    log_info "  - 1920 x 1080 px (1080p HD)"
+    log_info "  - 3840 x 2160 px (4K UHD, optional)"
+    log_success "tvOS screenshots captured!"
 }
 
 # Extract screenshots from xcresult bundle using proper name extraction
@@ -344,6 +382,10 @@ main() {
             setup_directories
             capture_watch
             ;;
+        --tv)
+            setup_directories
+            capture_tv
+            ;;
         --fastlane)
             capture_fastlane
             ;;
@@ -353,6 +395,7 @@ main() {
             capture_ipad
             capture_mac
             capture_watch
+            capture_tv
             log_success "All screenshots captured!"
             ;;
         --help|-h)
@@ -364,6 +407,7 @@ main() {
             echo "  --ipad      Capture iPad screenshots only"
             echo "  --mac       Capture macOS screenshots"
             echo "  --watch     Capture watchOS screenshots"
+            echo "  --tv        Capture tvOS (Apple TV) screenshots"
             echo "  --fastlane  Use fastlane for iOS/iPad"
             echo "  --all       Capture all platforms (default)"
             echo "  --help      Show this help"

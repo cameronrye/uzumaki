@@ -12,7 +12,7 @@ extension View {
         in shape: S,
         interactive: Bool = false
     ) -> some View {
-        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, *) {
             let glass = interactive ? Glass.regular.interactive() : .regular
             self.glassEffect(glass, in: shape)
         } else {
@@ -42,7 +42,7 @@ extension View {
         in shape: S,
         interactive: Bool = false
     ) -> some View {
-        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, *) {
             let baseGlass = interactive ? Glass.regular.interactive() : .regular
             self.glassEffect(baseGlass.tint(tintColor), in: shape)
         } else {
@@ -64,7 +64,7 @@ struct AdaptiveGlassButtonStyle: ButtonStyle {
     var isProminent: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
-        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, *) {
             configuration.label
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -105,7 +105,7 @@ struct AdaptiveGlassContainer<Content: View>: View {
     }
     
     var body: some View {
-        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, *) {
             GlassEffectContainer(spacing: spacing) {
                 content()
             }
@@ -121,9 +121,9 @@ extension View {
     /// Adds a symbol replace transition on iOS 26+, or a simple opacity transition on earlier versions
     @ViewBuilder
     func adaptiveSymbolTransition() -> some View {
-        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, *) {
             self.contentTransition(.symbolEffect(.replace))
-        } else if #available(iOS 17.0, macOS 14.0, watchOS 10.0, *) {
+        } else if #available(iOS 17.0, macOS 14.0, watchOS 10.0, tvOS 17.0, *) {
             self.contentTransition(.symbolEffect(.replace))
         } else {
             self.animation(.easeInOut(duration: 0.2), value: UUID())

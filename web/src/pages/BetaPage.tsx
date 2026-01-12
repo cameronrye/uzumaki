@@ -9,6 +9,7 @@ const showcaseImages = [
   { src: '/screenshots/ocean-log.png', alt: 'Logarithmic Ocean spiral', label: 'Logarithmic Ocean' },
   { src: '/screenshots/fire-fermat.png', alt: 'Fermat Fire spiral', label: 'Fermat Fire' },
   { src: '/screenshots/matrix-curlicue.png', alt: 'Curlicue Matrix fractal', label: 'Curlicue Matrix' },
+  { src: '/screenshots/appletv-classic-golden.png', alt: 'Classic Golden spiral on Apple TV', label: 'Apple TV' },
 ];
 
 export function BetaPage() {
@@ -52,7 +53,7 @@ export function BetaPage() {
           Join TestFlight Beta
         </a>
         <p className="testflight-note">
-          Requires iOS 17.0+, iPadOS 17.0+, macOS 14.0+, or watchOS 10.0+ with TestFlight installed.
+          Requires iOS 17.0+, iPadOS 17.0+, macOS 14.0+, tvOS 17.0+, or watchOS 10.0+ with TestFlight installed.
         </p>
       </div>
 
@@ -66,6 +67,10 @@ export function BetaPage() {
           <div className="feature-card">
             <h3>Liquid Glass Design</h3>
             <p>Beautiful iOS 26 / macOS 26 Liquid Glass effects with backward compatibility.</p>
+          </div>
+          <div className="feature-card">
+            <h3>tvOS App</h3>
+            <p>Big screen experience with Siri Remote navigation and Top Shelf integration.</p>
           </div>
           <div className="feature-card">
             <h3>watchOS App</h3>

@@ -74,7 +74,7 @@ for test in manifest:
 
         # Extract the base name (e.g., "Mac-01-Classic-Golden" from suggested name)
         # Format: "Mac-01-Classic-Golden_0_UUID.png"
-        if not any(suggested_name.startswith(prefix) for prefix in ["Mac-", "iPhone-", "iPad-", "Watch-"]):
+        if not any(suggested_name.startswith(prefix) for prefix in ["Mac-", "iPhone-", "iPad-", "Watch-", "AppleTV-"]):
             continue
 
         # Extract the base name before the _0_ suffix
@@ -93,6 +93,8 @@ for test in manifest:
             dest_folder = "iPad"
         elif base_name.startswith("iPhone-"):
             dest_folder = "iPhone"
+        elif base_name.startswith("AppleTV-"):
+            dest_folder = "AppleTV"
         else:
             continue
 
@@ -108,7 +110,7 @@ for test in manifest:
 EOF
 
 # Count copied files
-COPIED=$(find "$SCREENSHOTS_DIR" -name "Mac-*.png" -newer "$TEMP_DIR/manifest.json" 2>/dev/null | wc -l | tr -d ' ')
+COPIED=$(find "$SCREENSHOTS_DIR" \( -name "Mac-*.png" -o -name "AppleTV-*.png" -o -name "iPhone-*.png" -o -name "iPad-*.png" -o -name "Watch-*.png" \) -newer "$TEMP_DIR/manifest.json" 2>/dev/null | wc -l | tr -d ' ')
 
 echo ""
 if [ "$COPIED" -gt 0 ]; then

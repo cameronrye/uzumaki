@@ -52,6 +52,19 @@
 	<false/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Uzumaki needs access to save spiral images to your photo library.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.uzumaki.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>uzumaki</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
 

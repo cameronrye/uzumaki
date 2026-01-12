@@ -55,7 +55,8 @@
       },
       "selectedTests" : [
         "AppStoreScreenshotTests\/testCaptureAppStoreScreenshots()",
-        "MacAppStoreScreenshotTests\/testCaptureAppStoreScreenshots()"
+        "MacAppStoreScreenshotTests\/testCaptureAppStoreScreenshots()",
+        "TVAppStoreScreenshotTests\/testCaptureAppStoreScreenshots()"
       ]
     }
   ],

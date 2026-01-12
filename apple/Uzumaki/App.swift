@@ -7,11 +7,19 @@ import UzumakiUI
 struct UzumakiApp: App {
     var body: some Scene {
         WindowGroup {
+            #if os(tvOS)
+            TVContentView()
+                .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    handleDeepLink(url: url)
+                }
+            #else
             ContentView()
                 .preferredColorScheme(.dark)
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 700)
                 #endif
+            #endif
         }
         #if os(macOS)
         .windowStyle(.hiddenTitleBar)
@@ -53,5 +61,29 @@ struct UzumakiApp: App {
         }
         #endif
     }
+
+    #if os(tvOS)
+    /// Handle deep links from Top Shelf selections
+    /// URL format: uzumaki://preset/{preset-id}
+    private func handleDeepLink(url: URL) {
+        guard url.scheme == "uzumaki",
+              url.host == "preset",
+              let presetId = url.pathComponents.dropFirst().first else {
+            return
+        }
+
+        // Post notification to load the preset
+        NotificationCenter.default.post(
+            name: .loadPresetFromTopShelf,
+            object: nil,
+            userInfo: ["presetId": presetId]
+        )
+    }
+    #endif
 }
 
+#if os(tvOS)
+extension Notification.Name {
+    static let loadPresetFromTopShelf = Notification.Name("loadPresetFromTopShelf")
+}
+#endif
