@@ -6,9 +6,9 @@ export function PrivacyPage() {
       <div className="page-section">
         <h2>Introduction</h2>
         <p>
-          Uzumaki ("we," "our," or "us") is committed to protecting your privacy. 
-          This Privacy Policy explains how we collect, use, and safeguard your information 
-          when you use our spiral visualization application available on the web, iOS, iPadOS, and macOS.
+          Uzumaki ("we," "our," or "us") is committed to protecting your privacy.
+          This Privacy Policy explains how we collect, use, and safeguard your information
+          when you use our spiral visualization application available on the web, iOS, iPadOS, macOS, and Apple TV.
         </p>
       </div>
 
@@ -40,11 +40,15 @@ export function PrivacyPage() {
         <p>Uzumaki may request the following permissions:</p>
         <ul>
           <li>
-            <strong>Photo Library (iOS/macOS):</strong> If you choose to save a spiral image, 
-            we request permission to save images to your photo library. This permission is only 
+            <strong>Photo Library (iOS/macOS):</strong> If you choose to save a spiral image,
+            we request permission to save images to your photo library. This permission is only
             used when you explicitly tap the export/save button. We do not access or read your existing photos.
           </li>
         </ul>
+        <p>
+          <strong>Apple TV:</strong> The Apple TV version does not request any special permissions.
+          It runs entirely locally on your device with no network access or data collection.
+        </p>
       </div>
 
       <div className="page-section">
