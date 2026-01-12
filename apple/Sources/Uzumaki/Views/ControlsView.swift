@@ -1,6 +1,9 @@
 #if os(iOS) || os(macOS)
 import SwiftUI
 import UzumakiCore
+#if os(iOS)
+import ARKit
+#endif
 
 /// Control panel for spiral parameters
 public struct ControlsView: View {
@@ -9,11 +12,18 @@ public struct ControlsView: View {
     @Environment(\.openURL) private var openURL
     var onExport: (() -> Void)?
     var onShare: (() -> Void)?
+    var onARMode: (() -> Void)?
 
-    public init(viewModel: SpiralViewModel, onExport: (() -> Void)? = nil, onShare: (() -> Void)? = nil) {
+    public init(
+        viewModel: SpiralViewModel,
+        onExport: (() -> Void)? = nil,
+        onShare: (() -> Void)? = nil,
+        onARMode: (() -> Void)? = nil
+    ) {
         self.viewModel = viewModel
         self.onExport = onExport
         self.onShare = onShare
+        self.onARMode = onARMode
     }
 
     public var body: some View {
@@ -216,6 +226,17 @@ public struct ControlsView: View {
 
     private var moreMenu: some View {
         Menu {
+            // AR Mode option (iOS only, on supported devices)
+            #if os(iOS)
+            if ARWorldTrackingConfiguration.isSupported {
+                Button(action: { onARMode?() }) {
+                    Label("View in AR", systemImage: "arkit")
+                }
+
+                Divider()
+            }
+            #endif
+
             // Share option
             Button(action: { onShare?() }) {
                 Label("Share", systemImage: "square.and.arrow.up")

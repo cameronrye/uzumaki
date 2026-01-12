@@ -15,8 +15,15 @@ public typealias _SpiralParams = SpiralParams
 public typealias _SpiralPreset = SpiralPreset
 public typealias _Constants = Constants
 
-// Generation
+// Generation (2D)
 public typealias _SpiralPoint = SpiralPoint
 public typealias _SpiralPoints = SpiralPoints
 public typealias _SpiralGenerator = SpiralGenerator
+
+// 3D Models and Generation
+public typealias _SpiralDepthMode = SpiralDepthMode
+public typealias _SpiralParams3D = SpiralParams3D
+public typealias _SpiralPoint3D = SpiralPoint3D
+public typealias _SpiralPoints3D = SpiralPoints3D
+public typealias _SpiralGenerator3D = SpiralGenerator3D
 

@@ -52,6 +52,8 @@
 	<false/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Uzumaki needs access to save spiral images to your photo library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Uzumaki uses the camera to place 3D spirals in your environment using augmented reality.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -3,6 +3,7 @@ import SwiftUI
 import UzumakiCore
 #if os(iOS)
 import UIKit
+import ARKit
 #endif
 
 // MARK: - Cross-Platform Hover Effect
@@ -41,6 +42,11 @@ public struct ContentView: View {
     @State private var gestureStartPan: CGSize = .zero
     @State private var isPanGestureActive: Bool = false
     @State private var pinchCenter: CGPoint? = nil
+
+    // AR Mode state (iOS only)
+    #if os(iOS)
+    @State private var showARMode: Bool = false
+    #endif
 
     // Pre-prepared haptic generators for lower latency (iOS only)
     #if os(iOS)
@@ -102,6 +108,16 @@ public struct ContentView: View {
                 toastView(message: message)
             }
         }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showARMode) {
+            if #available(iOS 17.0, *) {
+                ARSpiralContainerView(
+                    viewModel: viewModel,
+                    onDismiss: { showARMode = false }
+                )
+            }
+        }
+        #endif
         .onAppear {
             // Pause animation if user prefers reduced motion
             if reduceMotion {
@@ -179,9 +195,24 @@ public struct ContentView: View {
                     Spacer().frame(height: 8)
 
                     // Controls
-                    ControlsView(viewModel: viewModel, onExport: exportSpiral, onShare: shareSpiral)
+                    #if os(iOS)
+                    ControlsView(
+                        viewModel: viewModel,
+                        onExport: exportSpiral,
+                        onShare: shareSpiral,
+                        onARMode: { showARMode = true }
+                    )
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
+                    #else
+                    ControlsView(
+                        viewModel: viewModel,
+                        onExport: exportSpiral,
+                        onShare: shareSpiral
+                    )
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                    #endif
                 }
             }
         }
@@ -652,6 +683,20 @@ public struct ContentView: View {
                 .foregroundStyle(.white)
                 .adaptiveHoverEffect()
             }
+
+            // AR Mode button (only on devices that support ARKit)
+            #if os(iOS)
+            if ARWorldTrackingConfiguration.isSupported {
+                Button(action: { showARMode = true }) {
+                    Label("View in AR", systemImage: "arkit")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(BrandColors.primary.opacity(0.8))
+                .foregroundStyle(.white)
+                .adaptiveHoverEffect()
+            }
+            #endif
         }
     }
 

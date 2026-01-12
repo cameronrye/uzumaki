@@ -203,3 +203,125 @@ for each point (x, y):
 4. **Division by Zero:** Hyperbolic and Lituus use theta > 0.1 threshold
 5. **Performance Mode:** Limit numSteps to 500 maximum
 
+---
+
+## 3D Extension (AR/VR)
+
+The 3D extension allows 2D spirals to be projected into 3D space for augmented reality and spatial computing applications. All 3D generation reuses the core 2D algorithms and applies depth transformations.
+
+### 3D-Specific Parameters
+
+| Parameter | Description | Default | Range |
+|-----------|-------------|---------|-------|
+| depthMode | How 2D points extend to 3D | flat | see below |
+| scale3D | Scale factor (meters) | 0.001 | 0.0001 - 1.0 |
+| rotationX | X-axis rotation (radians) | 0 | -PI to PI |
+| rotationY | Y-axis rotation (radians) | 0 | -PI to PI |
+| rotationZ | Z-axis rotation (radians) | 0 | -PI to PI |
+| tubeRadius | Mesh tube radius (meters) | 0.002 | 0.0005 - 0.01 |
+| tubeSegments | Segments around tube | 8 | 4 - 16 |
+
+### Depth Modes
+
+#### 1. Flat
+All points remain on the XY plane with z = 0.
+
+```
+z = 0
+```
+
+#### 2. Helix
+Spiral extends upward as a helix. Z increases based on cumulative angle.
+
+```
+for i in 0..<numSteps:
+    theta = i * stepSize
+    z = (theta / (2 * PI)) * pitch
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| pitch | Z increase per full rotation |
+
+#### 3. Layered
+Creates multiple copies of the 2D spiral at different Z levels.
+
+```
+totalHeight = (layerCount - 1) * spacing
+startZ = -totalHeight / 2
+
+for layer in 0..<layerCount:
+    z = startZ + layer * spacing
+    // copy all 2D points at this z
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| count | Number of layers |
+| spacing | Distance between layers |
+
+#### 4. Cone
+Points rise based on distance from center, forming a cone shape.
+
+```
+for each point (x, y):
+    radius = sqrt(x^2 + y^2)
+    z = radius * tan(angle)
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| angle | Cone angle in radians |
+
+#### 5. Bowl
+Parabolic bowl shape where Z increases quadratically with radius.
+
+```
+maxRadius = max radius of all points
+
+for each point (x, y):
+    radius = sqrt(x^2 + y^2)
+    normalizedRadius = radius / maxRadius
+    z = depth * normalizedRadius^2
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| depth | Maximum bowl depth |
+
+### 3D Transformation Order
+
+1. Generate 2D points using standard algorithms
+2. Apply depth mode to calculate Z coordinates
+3. Apply 3D scale factor
+4. Apply rotation (X, then Y, then Z order)
+
+### Rotation Matrix
+
+Rotation uses Euler angles in XYZ order:
+
+```
+R = Rz * Ry * Rx
+
+Rx = | 1    0        0      |
+     | 0   cos(rx) -sin(rx) |
+     | 0   sin(rx)  cos(rx) |
+
+Ry = | cos(ry)  0  sin(ry) |
+     |   0      1    0     |
+     |-sin(ry)  0  cos(ry) |
+
+Rz = | cos(rz) -sin(rz)  0 |
+     | sin(rz)  cos(rz)  0 |
+     |   0        0      1 |
+```
+
+### Preset Configurations
+
+| Preset | Depth Mode | Rotation | Use Case |
+|--------|------------|----------|----------|
+| tableTop | flat | rotationX: -PI/2 | Horizontal surface AR |
+| standingHelix | helix(pitch: 30) | none | Upright 3D display |
+| volumetric | layered(5, 15) | none | visionOS volumes |
+| bowlShape | bowl(depth: 40) | none | Decorative display |
+
