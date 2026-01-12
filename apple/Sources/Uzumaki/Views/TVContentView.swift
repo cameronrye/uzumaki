@@ -118,14 +118,27 @@ public struct TVContentView: View {
                 resetControlsTimer()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .loadPresetFromTopShelf)) { notification in
-            // Handle deep link from Top Shelf
-            if let presetId = notification.userInfo?["presetId"] as? String,
-               let preset = SpiralPreset.allPresets.first(where: { $0.id == presetId }) {
-                viewModel.loadPreset(preset)
-                showControlsTemporarily()
-            }
+        .onOpenURL { url in
+            // Handle deep link from Top Shelf directly
+            // URL format: uzumaki://preset/{preset-id}
+            handleDeepLink(url: url)
         }
+    }
+
+    // MARK: - Deep Link Handling
+
+    /// Handle deep links from Top Shelf selections
+    /// URL format: uzumaki://preset/{preset-id}
+    private func handleDeepLink(url: URL) {
+        guard url.scheme == "uzumaki",
+              url.host == "preset",
+              let presetId = url.pathComponents.dropFirst().first,
+              let preset = SpiralPreset.allPresets.first(where: { $0.id == presetId }) else {
+            return
+        }
+
+        viewModel.loadPreset(preset)
+        showControlsTemporarily()
     }
 
     // MARK: - Touch Surface Handling
@@ -479,14 +492,52 @@ struct TVSpiralCanvasView: View {
 
                 guard points.count > 1 else { return }
 
-                // Build single path for glow effect
-                let spiralPath = buildSpiralPath(points: points, center: center)
-
-                // Draw glow layers
-                drawGlow(context: context, path: spiralPath)
-
-                // Draw main spiral with batched colors
-                drawBatchedSpiral(context: context, points: points, center: center, colors: colors)
+                // Draw based on line style using shared renderer
+                switch viewModel.lineStyle {
+                case .points:
+                    SpiralRenderer.drawPoints(
+                        context: context,
+                        points: points,
+                        center: center,
+                        colors: colors,
+                        zoom: viewModel.zoom
+                    )
+                case .triangles:
+                    SpiralRenderer.drawTriangles(
+                        context: context,
+                        points: points,
+                        center: center,
+                        colors: colors
+                    )
+                case .glow:
+                    SpiralRenderer.drawGlow(
+                        context: context,
+                        points: points,
+                        center: center,
+                        glowColor: viewModel.glowColor,
+                        performanceMode: !viewModel.highQualityMode,
+                        glowOnly: true
+                    )
+                default:
+                    // Draw glow first (in high quality mode)
+                    if viewModel.highQualityMode {
+                        SpiralRenderer.drawGlow(
+                            context: context,
+                            points: points,
+                            center: center,
+                            glowColor: viewModel.glowColor,
+                            performanceMode: false,
+                            glowOnly: false
+                        )
+                    }
+                    SpiralRenderer.drawLine(
+                        context: context,
+                        points: points,
+                        center: center,
+                        colors: colors,
+                        lineStyle: viewModel.lineStyle
+                    )
+                }
             }
             .onChange(of: timeline.date) { oldValue, newValue in
                 let delta = newValue.timeIntervalSince(oldValue)
@@ -497,90 +548,6 @@ struct TVSpiralCanvasView: View {
         .background(viewModel.backgroundColor)
         .accessibilityLabel("Animated spiral visualization")
         .accessibilityAddTraits(.updatesFrequently)
-    }
-
-    /// Build a single path for the entire spiral
-    private func buildSpiralPath(points: SpiralPoints, center: CGPoint) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(
-            x: center.x + CGFloat(points.x(at: 0)),
-            y: center.y + CGFloat(points.y(at: 0))
-        ))
-
-        for i in 1..<points.count {
-            path.addLine(to: CGPoint(
-                x: center.x + CGFloat(points.x(at: i)),
-                y: center.y + CGFloat(points.y(at: i))
-            ))
-        }
-        return path
-    }
-
-    /// Draw glow effect using the pre-built path
-    private func drawGlow(context: GraphicsContext, path: Path) {
-        // Outer glow
-        context.stroke(
-            path,
-            with: .color(viewModel.glowColor.opacity(0.25)),
-            style: StrokeStyle(lineWidth: 14, lineCap: .round, lineJoin: .round)
-        )
-
-        // Inner glow
-        context.stroke(
-            path,
-            with: .color(viewModel.glowColor.opacity(0.45)),
-            style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round)
-        )
-    }
-
-    /// Draw spiral with batched color segments for better performance
-    private func drawBatchedSpiral(
-        context: GraphicsContext,
-        points: SpiralPoints,
-        center: CGPoint,
-        colors: [Color]
-    ) {
-        let totalPoints = points.count
-        var currentBatchPath = Path()
-        var currentColorIndex = 0
-
-        for i in 1..<totalPoints {
-            let progress = Double(i) / Double(totalPoints)
-            let colorIndex = Int(progress * Double(colors.count - 1))
-
-            // Start new batch if color changed
-            if colorIndex != currentColorIndex && currentBatchPath.isEmpty == false {
-                // Stroke current batch
-                context.stroke(
-                    currentBatchPath,
-                    with: .color(colors[min(currentColorIndex, colors.count - 1)]),
-                    style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round)
-                )
-                currentBatchPath = Path()
-                currentColorIndex = colorIndex
-            }
-
-            // Add segment to current batch
-            if currentBatchPath.isEmpty {
-                currentBatchPath.move(to: CGPoint(
-                    x: center.x + CGFloat(points.x(at: i - 1)),
-                    y: center.y + CGFloat(points.y(at: i - 1))
-                ))
-            }
-            currentBatchPath.addLine(to: CGPoint(
-                x: center.x + CGFloat(points.x(at: i)),
-                y: center.y + CGFloat(points.y(at: i))
-            ))
-        }
-
-        // Stroke final batch
-        if !currentBatchPath.isEmpty {
-            context.stroke(
-                currentBatchPath,
-                with: .color(colors[min(currentColorIndex, colors.count - 1)]),
-                style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round)
-            )
-        }
     }
 }
 
@@ -1050,13 +1017,6 @@ struct TVTouchSurfaceGestureView: View {
                 onTouchPositionChanged(currentPosition)
             }
     }
-}
-
-// MARK: - Notification Names
-
-extension Notification.Name {
-    /// Notification posted when a preset is selected from the Top Shelf
-    static let loadPresetFromTopShelf = Notification.Name("loadPresetFromTopShelf")
 }
 
 #Preview {
